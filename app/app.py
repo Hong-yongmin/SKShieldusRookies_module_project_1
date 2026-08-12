@@ -4,6 +4,74 @@ from dotenv import load_dotenv
 import os
 
 from modules.functions import recommend_destination, is_peak_season, estimate_expense
+
+# ==========================================
+# 입력값 코드
+# ==========================================
+
+# 성별
+SEX_CODES = {
+    1: '남성',
+    2: '여성'
+}
+
+# 연령대
+AGE_CODES = {
+    1: '15~19세',
+    2: '20대',
+    3: '30대',
+    4: '40대',
+    5: '50대',
+    6: '60대 이상'
+}
+
+# 본인 포함 여행 인원수
+GROUP_CODES = {
+    1: '1명',
+    2: '2명',
+    3: '3명 이상'
+}
+
+# 여행 테마
+THEME_CODES = {
+    1: '식도락(음식/미식) 관광',
+    2: '쇼핑',
+    3: '자연경관 감상',
+    4: '휴양/휴식(웰니스)',
+    5: '고궁/역사 유적지 방문',
+    6: '전통문화 체험',
+    7: '박물관·전시관 관람',
+    8: 'K-POP·한류 콘텐츠 관광',
+    9: '연극·뮤지컬·발레 등 공연 관람',
+    10: '지역 축제 참여',
+    11: '유흥·나이트라이프·카지노',
+    12: '놀이공원·테마파크',
+    13: '뷰티·미용 관광',
+    14: '치료·건강검진',
+    15: '스포츠·레포츠 관람',
+    16: '스포츠·레포츠 참가',
+    17: '기타'
+}
+
+# 희망 권역
+AREA_OPTIONS = [
+    '전체',
+    '수도권',
+    '지방'
+]
+
+# ==========================================
+# 코드 변환
+# ==========================================
+
+def get_code(label, code_dict):
+    return next(
+        code
+        for code, value in code_dict.items()
+        if value == label
+    )
+
+
 # ==========================================
 # API 환경 설정
 # ==========================================
@@ -11,11 +79,13 @@ from modules.functions import recommend_destination, is_peak_season, estimate_ex
 load_dotenv()
 api_key = os.getenv('OPENAI_API_KEY')
 
+# 키 없을 경우 예외처리
 if not api_key:
     st.error('api key가 존재하지 않습니다.')
     st.stop()
 
 client = OpenAI(api_key=api_key)
+
 
 # ==========================================
 # 페이지 레이아웃
@@ -29,6 +99,7 @@ st.set_page_config(
 st.title('K-Guide')
 st.caption('AI 기반 여행 추천 서비스')
 
+
 # ==========================================
 # Session State
 # ==========================================
@@ -37,6 +108,14 @@ st.caption('AI 기반 여행 추천 서비스')
 if 'destinations' not in st.session_state:
     st.session_state.destinations = []
 
+# 여행지별 정보 결과 저장
+if 'recommendation_context' not in st.session_state:
+    st.session_state.recommendation_context = []
+
+# API 결과 저장
+if 'api_context' not in st.session_state:
+    st.session_state.api_context = []
+
 # 여행 추천 실행 여부 저장
 if 'trip_started' not in st.session_state:
     st.session_state.trip_started = False
@@ -44,6 +123,7 @@ if 'trip_started' not in st.session_state:
 # 챗봇 대화 기록 저장
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
 
 # ==========================================
 # 사용자 입력 영역
@@ -56,39 +136,54 @@ st.sidebar.title('사용자 입력 조건')
 if st.sidebar.button('추천 내용 초기화'):
 
     st.session_state.destinations = []
+    st.session_state.recommendation_context = []
+    st.session_state.api_context = []
     st.session_state.trip_started = False
     st.session_state.messages = []
 
-    st.rerun()
+    st.toast('추천 내용이 초기화 되었습니다.')
+
 
 # 성별
-gender = st.sidebar.selectbox(
+gender_label = st.sidebar.radio(
     '성별',
-    ['남성', '여성']
+    list(SEX_CODES.values())
 )
+
+gender = get_code(gender_label, SEX_CODES)
+
 
 # 나이
-age = st.sidebar.number_input(
-    '나이',
-    min_value=1,
-    max_value=100,
-    value=20
+age_label = st.sidebar.selectbox(
+    '연령대',
+    list(AGE_CODES.values())
 )
+
+age = get_code(age_label, AGE_CODES)
+
 
 # 여행 테마
-theme = st.sidebar.selectbox(
+theme_label = st.sidebar.selectbox(
     '여행 테마',
-    [
-        '자연', '맛집', '문화', '액티비티', '휴양'
-    ]
+    list(THEME_CODES.values())
 )
 
+theme = get_code(theme_label, THEME_CODES)
+
+
 # 인원수
-num_of_people = st.sidebar.number_input(
-    '인원수',
-    min_value=1,
-    max_value=30,
-    value=2
+num_of_people_label = st.sidebar.selectbox(
+    '본인 포함 여행 인원수',
+    list(GROUP_CODES.values())
+)
+
+num_of_people = get_code(num_of_people_label, GROUP_CODES)
+
+
+# 희망 권역
+area = st.sidebar.selectbox(
+    '희망 권역',
+    AREA_OPTIONS
 )
 
 # 여행 날짜
@@ -100,12 +195,12 @@ trip_date = st.sidebar.date_input(
 period = st.sidebar.number_input(
     '여행 기간',
     min_value=1,
-    max_value=30,
     value=3
 )
 
+
 # ==========================================
-# 메뉴 선택
+# 메뉴 선택 ( 여행 추천 / 챗봇 )
 # ==========================================
 
 selected_tab = st.radio(
@@ -114,6 +209,96 @@ selected_tab = st.radio(
     horizontal=True,
     label_visibility='collapsed'
 )
+
+
+# ==========================================
+# 더미 API 데이터
+# 실제 API 연결 전 UI 테스트를 위한 더미 데이터
+# ==========================================
+
+def create_dummy_api_context(destinations):
+
+    api_context = []
+
+    for destination in destinations:
+
+        # 여행지별 더미 데이터
+        data = {
+
+            'destination': destination,
+
+            'accommodations': [
+                {
+                    'name': f'{destination} K-Guide 호텔',
+                    'rating': 4.7,
+                    'price': 120000,
+                    'address': f'{destination} 중심가',
+                    'url': 'https://example.com',
+                    'latitude': 37.5665,
+                    'longitude': 126.9780
+                }
+            ],
+
+            'restaurants': [
+                {
+                    'name': f'{destination} 대표 맛집',
+                    'category': '한식',
+                    'rating': 4.6,
+                    'price': 20000,
+                    'address': f'{destination} 맛집거리',
+                    'opening_hours': '11:00~21:00',
+                    'url': 'https://example.com',
+                    'latitude': 37.5665,
+                    'longitude': 126.9780
+                }
+            ],
+
+            'weather': {
+                'max_temp': 32,
+                'min_temp': 21,
+                'weather': '맑음',
+                'rain_probability': 20,
+                'air_quality': '좋음'
+            },
+
+            'attractions': [
+                {
+                    'name': f'{destination} 대표 관광지',
+                    'category': '문화관광',
+                    'description': f'{destination}의 대표적인 관광 명소입니다.',
+                    'rating': 4.8,
+                    'address': f'{destination} 관광지',
+                    'opening_hours': '09:00~18:00',
+                    'url': 'https://example.com',
+                    'latitude': 37.5665,
+                    'longitude': 126.9780
+                }
+            ],
+
+            'flights': [
+                {
+                    'airline': 'K-Guide 항공',
+                    'price': 85000,
+                    'departure_time': '09:30',
+                    'arrival_time': '10:40',
+                    'duration': '1시간 10분'
+                }
+            ],
+
+            'transportation': [
+                {
+                    'type': '대중교통',
+                    'route': '지하철 → 버스',
+                    'duration': '45분',
+                    'price': 1550
+                }
+            ]
+        }
+
+        api_context.append(data)
+
+    return api_context
+
 
 # ==========================================
 # 기능 연결 - 여행 추천 결과
@@ -126,91 +311,222 @@ if selected_tab == '여행 추천':
 
         with st.status('맞춤 여행지를 분석합니다...', expanded=True) as status:
 
-            st.write('여행지 선호도 분석 중...')
-
             # 여행지 추천
-            st.session_state.destinations = recommend_destination(
-                gender,
-                age,
-                theme,
-                num_of_people
-            )
+            try:
+                st.write('여행지 추천 중...')
 
-            st.write('추천 여행지 분석 완료')
+                st.session_state.destinations = recommend_destination(
+                    gender,
+                    age,
+                    theme,
+                    num_of_people
+                )
 
-            status.update(
-                label='여행지 추천 완료!',
-                state='complete',
-                expanded=False
-            )
+                # 추천 결과가 없는 경우
+                if not st.session_state.destinations:
+                    raise ValueError('추천 여행지가 없습니다.')
+        
+                # 성수기 비수기 / 경비 계산
+                st.write('여행지별 정보 분석 중...')
 
-            st.session_state.trip_started = True
+                recommendation_context=[]
+
+                for destination in st.session_state.destinations:
+                    # 성수기 / 비수기
+                    try:
+                        peak = is_peak_season(
+                            trip_date,
+                            destination
+                        )
+                    except Exception:
+                        peak = None
+
+                    # 예상 경비
+                    try:
+                        expense = estimate_expense(
+                            period,
+                            destination,
+                            num_of_people,
+                            theme
+                        )
+                    except Exception:
+                        expense = None
+
+                    recommendation_context.append({
+                        'destination': destination,
+                        'peak_season': peak,
+                        'expense': expense
+                    })
+
+                # 결과 저장
+                st.session_state.recommendation_context = (
+                    recommendation_context
+                )
+
+                # ==========================================
+                # API 더미 데이터 생성
+                st.write('여행 정보 준비 중...')
+                st.session_state.api_context = (
+                    create_dummy_api_context(
+                        st.session_state.destinations
+                    )
+                )
+                # ==========================================
+
+                st.session_state.trip_started = True
+
+                st.write('추천 여행지 분석 완료')
+
+                status.update(
+                    label='여행지 추천 완료!',
+                    state='complete',
+                    expanded=False
+                )
+            except Exception as e:
+                st.error(f'여행지 추천 중 오류가 발생했습니다. : {e}')    
 
     if st.session_state.trip_started:
 
         st.header('추천 여행지')
 
-        destinations = st.session_state.destinations
+        # 추천 결과 전체 가져오기
+        recommendations = st.session_state.recommendation_context
 
-        cols = st.columns(len(destinations))
 
-        for i, destination in enumerate(destinations):
+        # 추천 여행지 개수만큼 컬럼 생성
+        cols = st.columns(len(recommendations))
+
+        # 추천 결과 하나씩 출력
+        for i, recommendation in enumerate(recommendations):
 
             with cols[i]:
 
+                destination = recommendation['destination']
+                peak = recommendation['peak_season']
+                expense = recommendation['expense']
+
                 st.subheader(destination)
 
-                # 성수기/비수기
-                peak = is_peak_season(
-                    trip_date,
-                    destination
-                )
-
-                if peak:
+                # 성수기 / 비수기 표시
+                if peak == True:
                     st.warning('성수기입니다.')
-                else:
+                elif peak == False:
                     st.success('비수기입니다.')
+                else:
+                    st.info('성수기 여부를 확인할 수 없습니다.')
 
                 # 예상 경비
-                expense = estimate_expense(
-                    period,
-                    destination,
-                    num_of_people,
-                    theme
-                )
-
-                st.metric(
-                    '예상 경비',
-                    f'{expense:,}원'
-                )
+                if expense is not None:
+                    st.metric(
+                        '예상 경비',
+                        f'{expense:,}원'
+                    )
+                else:
+                    st.info('예상 경비를 확인할 수 없습니다.')
 
         # ==========================================
         # 기능 연걸 - 기타 정보
-        # UI만 구성, 하드코딩
         # ==========================================
 
         st.divider()
-
+        
         # 숙소, 음식점 정보
         st.header('숙소, 음식점 정보')
 
         col1, col2 = st.columns(2)
 
+        # 숙소
         with col1:
             st.subheader('추천 숙소')
 
-            st.info('000호텔')
-            st.write('별점:4.7')
-            st.write('1박 약 120,000원')
-            st.write('위치정보')
+            api_context = st.session_state.api_context
 
+            if api_context:
+
+                hotel_list = api_context[0].get('accommodations', [])
+
+                if hotel_list:
+
+                    hotel = hotel_list[0]
+                    # 숙소명
+                    st.info(hotel['name'])
+                    # 별점
+                    st.write(f"별점: {hotel['rating']}")
+                    # 가격
+                    st.write(f"1박 약 {hotel['price']:,}원")
+                    # 주소
+                    st.write(f"주소: {hotel['address']}")
+
+                    # url
+                    if hotel.get('url'):
+
+                        st.link_button(
+                            '상세정보',
+                            hotel['url']
+                        )
+
+                    # 지도 시각화
+                    if(
+                        hotel.get('latitude') is not None
+                        and hotel.get('longitude') is not None
+                    ):
+                        st.map({
+                            'lat':[hotel['latitude']],
+                            'lon':[hotel['longitude']]
+                        })
+
+                    else: st.info('추천 숙소 정보가 없습니다.')
+
+                else:
+                    st.info('숙소 정보를 불러오는 중입니다.')
+
+        # 맛집
         with col2:
             st.subheader('추천 맛집')
             
-            st.info('제주 흑돼지')
-            st.write('별점:4.7')
-            st.write('1인분 약 20,000원')
-            st.write('위치정보')
+            if api_context:
+
+                restaurant_list = api_context[0].get('restaurants', [])
+
+                if restaurant_list:
+
+                    restaurant = restaurant_list[0]
+                    # 음식점명
+                    st.info(restaurant['name'])
+                    # 음식 종류
+                    st.write(f"음식 종류: {restaurant['category']}")
+                    # 별점
+                    st.write(f"별점: {restaurant['rating']}")
+                    # 가격
+                    st.write(f"가격: 약 {restaurant['price']:,}원")
+                    # 주소
+                    st.write(f"주소: {restaurant['address']}")
+                    # 영업시간
+                    st.write(f"영업시간: {restaurant['opening_hours']}")
+
+                    # url
+                    if restaurant.get('url'):
+
+                        st.link_button(
+                            '상세 정보',
+                            restaurant['url']
+                        )
+
+                    # 지도 시각화
+                    if(
+                        restaurant.get('latitude') is not None
+                        and restaurant.get('longitude') is not None
+                    ):
+                        st.map({
+                            'lat':[restaurant['latitude']],
+                            'lon':[restaurant['longitude']]
+                        })     
+                                       
+                else:
+                    st.info('추천 맛집 정보가 없습니다.')
+
+            else:           
+                st.info('맛집 정보를 불러오는 중입니다.')
 
 
         # 날씨, 관광지 추천
@@ -218,40 +534,150 @@ if selected_tab == '여행 추천':
 
         col1, col2 = st.columns(2)
 
+        # 날씨
         with col1:
             st.subheader('날씨 정보')
 
-            st.info('최고 기온, 최저 기온')
-            st.write('맑음')
-            st.write('강수 확률 : 00%')
-            st.write('미세먼지 농도 : 양호')
+            if api_context:
+
+                weather = api_context[0].get('weather', {})
+
+                if weather:
+                    # 기온
+                    st.info(
+                        f"최고 {weather['max_temp']}°C\n"
+                        f"최저 {weather['min_temp']}°C"
+                    )
+                    # 날씨
+                    st.write(f"날씨: {weather['weather']}")
+                    # 강수 확률
+                    st.write(f"강수 확률: {weather['rain_probability']}%")
+                    # 미세먼지
+                    st.write(f"미세먼지: {weather['air_quality']}")
+
+                else:
+                    st.info('날씨 정보가 없습니다.')
+
+            else:
+                st.info('날씨 정보를 불러오는 중입니다.')
+
 
         with col2:
             st.subheader('추천 관광지')
 
-            st.info('000해수욕장')
-            st.write('숙소에서 거리')
-            st.write('테마')
+            if api_context:
+
+                attraction_list = api_context[0].get(
+                    'attractions',
+                    []
+                )
+
+                if attraction_list:
+
+                    attraction = attraction_list[0]
+                    # 관광지명
+                    st.info( attraction['name'])
+                    # 관광지 테마
+                    st.write(f"테마: {attraction['category']}")
+                    # 설명
+                    st.write(attraction['description'])
+                    # 별점
+                    st.write(f"별점: {attraction['rating']}")
+                    # 주소
+                    st.write(f"주소: {attraction['address']}")
+                    # 운영시간
+                    st.write(f"운영시간: {attraction['opening_hours']}")
+
+                    # url
+                    if attraction.get('url'):
+
+                        st.link_button(
+                            '상세 정보',
+                            attraction['url']
+                        )
+
+                    # 지도 시각화
+                    if(
+                        attraction.get('latitude') is not None
+                        and attraction.get('longitude') is not None
+                    ):
+                        st.map({
+                            'lat':[attraction['latitude']],
+                            'lon':[attraction['longitude']]
+                        })
+
+                else:
+                    st.info('추천 관광지 정보가 없습니다.')
+
+            else:
+                st.info('관광지 정보를 불러오는 중입니다.')
 
         # 항공편, 교통편
         st.header('항공편, 교통편')
 
         col1, col2 = st.columns(2)
 
+        # 항공편
         with col1:
             st.subheader('항공편')
 
-            st.info('00항공')
-            st.write('가격')
-            st.write('출발 시간')
-            st.write('소요 시간')
+            if api_context:
 
+                flights = api_context[0].get(
+                    'flights',
+                    []
+                )
+
+                if flights:
+
+                    flight = flights[0]
+                    # 항공사
+                    st.info(flight['airline'])
+                    # 가격
+                    st.write(f"가격: {flight['price']:,}원")
+                    # 출발 시간
+                    st.write(f"출발: {flight['departure_time']}")
+                    # 도착 시간
+                    st.write(f"도착: {flight['arrival_time']}")
+                    # 소요 시
+                    st.write(f"소요 시간: {flight['duration']}")
+
+                else:
+                    st.info('항공편 정보가 없습니다.')
+
+            else:
+                st.info('항공편 정보를 불러오는 중입니다.')
+
+
+        # 교통편
         with col2:
             st.subheader('교통편')
 
-            st.info('대중교통')
-            st.write('소요시간')
-            st.write('가격')
+            if api_context:
+
+                transportation = api_context[0].get(
+                    'transportation',
+                    []
+                )
+
+                if transportation:
+
+                    transport = transportation[0]
+                    # 교통수단
+                    st.info(transport['type'])
+                    # 이동경로
+                    st.write(f"경로: {transport['route']}")
+                    # 소요시간
+                    st.write(f"소요 시간: {transport['duration']}")
+                    # 요금
+                    st.write(f"요금: {transport['price']:,}원")
+
+                else:
+                    st.info('교통편 정보가 없습니다.')
+
+            else:
+                st.info('교통편 정보를 불러오는 중입니다.')
+
 
 # ==========================================
 # OpenAI 챗봇
