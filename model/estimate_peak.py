@@ -26,15 +26,6 @@ class EstimatePeak:
         load_dotenv()를 한번 실행한 이후 선언해주세요.\n
         내부적으로 load_dotenv()를 실행하지 않고 환경변수를 받아옵니다.
         """
-        # 가까운 날짜에 대해 방문자수 집중률을 알려주는 api
-        self.predict_url='https://apis.data.go.kr/B551011/TatsCnctrRateService/tatsCnctrRatedList'
-        self.predict_url += '?serviceKey=' + str(os.getenv('VISITOR_DENSITY_KEY')) # 키 추가
-        self.predict_url += '&MobileApp=TestApp'   # 필수 파라미터
-        self.predict_url += '&MobileOS=ETC'        # 필수 파라미터
-        self.predict_url += '&_type=json'          # json 형식으로 응답
-        self.predict_url += '&areaCd={areaCd}'     # 지역 코드
-        self.predict_url += '&signguCd={signguCd}' # 시군구코드
-
         # 특정 연, 월의 공휴일을 알려주는 api
         self.holiday_url = 'http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo'
         self.holiday_url += '?ServiceKey=' + str(os.getenv('HOLIDAY_KEY'))
@@ -43,7 +34,7 @@ class EstimatePeak:
         self.holiday_url += '&_type=json'            # json으로 응답
 
         self.signgu_code_info = pd.read_excel('data/한국관광공사_OpenAPI_관광지_시군구_코드정보_v1.0.xlsx')
-        self.peak_threshold = pd.read_pickle('data/peak_threshold.pkl') # 지역별 월 평균 방문자수
+        self.minmax_per_signgu = pd.read_pickle('data/min_max_per_signgu.pkl') # 지역별 월 평균 방문자수 최저, 최고치
         self.tounum_per_day = pd.read_pickle('data/tounum_per_day.pkl') # 전년도 방문자수 추가용 데이터셋
         self.model = joblib.load('data/is_peak_model.pkl')
         # 날짜, 지역에 따른 방문자수 예측 모델
@@ -51,64 +42,53 @@ class EstimatePeak:
 
         self.tounum_per_day['baseYmd'] = pd.to_datetime(self.tounum_per_day['baseYmd'])
 
+        self.metropolitan = ['서울특별시', '부산광역시', '대구광역시', '인천광역시',
+                             '광주광역시', '대전광역시', '울산광역시', '제주특별자치도' ] # 광역시는 별도 처리 필요
+
     def get_area_signgu_code(self, destination):
         """
-        여행지의 지역 및 시군구코드를 찾아 반환합니다.\n
-        반환 형식은 (areaCd, signguCd) 형식의 tuple입니다.\n
-        destination : ['서울특별시', '구로구']
+        여행지의 시군구코드를 찾아 반환합니다.\n
+        반환 형식은 [signguCd, cd, ...] 형식의 list입니다.\n
+        destination : '서울특별시'
         """
-        # 지역과 시군구 이름이 일치하는 열 추출
-        row = self.signgu_code_info[(self.signgu_code_info['areaNm'] == destination[0]) 
-                                    & (self.signgu_code_info['sigunguNm'] == destination[1])]
+        if destination in self.metropolitan: # 광역시인 경우 그에 해당하는 시군구 추출
+            signgu = self.signgu_code_info[self.signgu_code_info['areaNm'] == destination]
+        else: # 수원시 장안구/권선구/팔달구/영통구 와 같이 하나의 시가 여러 시군구로 나뉘어 있는 경우 고려
+            signgu = self.signgu_code_info[self.signgu_code_info['sigunguNm'].str.contains(destination)]
+        return list(signgu['sigunguCd'].values)
 
-        if row.empty:
-            return -1, -1  # 일치하는 시군구를 찾지 못하면 -1 반환
-        else:
-            return (row['areaCd'].values[0], row['sigunguCd'].values[0]) # 일치하는 시군구를 찾으면 코드 반환
-
-    def is_peak_season(self, trip_date, destination):
+    def is_peak_season(self, trip_date, trip_period, destination):
         """
         여행 날짜, 여행지를 입력받아 성수기일지 예측합니다.\n
-        성수기라면 True, 비수기라면 False를 반환합니다.\n
+        해당 기간동안의 방문객 비율의 평균을 반환합니다.\n
         destination에 해당하는 시군구를 찾지 못했을 때는 None을 반환합니다.\n
-        trip_date : ['출발날짜', '마지막날짜']\n
-        destination : ['서울특별시', '구로구']
+        trip_date : datetime\n
+        trip_period : 여행 기간\n
+        destination : '서울특별시'
         """
-        area_cd, sigungu_cd = self.get_area_signgu_code(destination)
-        if area_cd == -1:
-            return None # destination에 해당하는 시군구를 찾지 못했을 경우 None 반환
+        sigungu_cds = self.get_area_signgu_code(destination)
+        if len(sigungu_cds) == 0:
+            return None
+        area_cd = int(sigungu_cds[0]) // 1000 # 지역 코드는 시군구코드의 앞 2자리와 동일
         area_cd = str(area_cd)
-        sigungu_cd = str(sigungu_cd)
-        
-        response = requests.get(self.predict_url.format(areaCd=area_cd, signguCd=sigungu_cd)) # 집중률 예측 API 호출
-        json_data = json.loads(response.text) 
-        df = pd.DataFrame(json_data['response']['body']['items']['item']) # 응답 본문을 Dataframe 객체로 변환
 
-        base_ymd = pd.to_datetime(df['baseYmd'])
+        sum = 0 # 방문객 비율 합계
+        for sigungu_cd in sigungu_cds:
+            sigungu_cd = str(sigungu_cd)
 
-        start_date = pd.to_datetime(trip_date[0])
-        end_date = pd.to_datetime(trip_date[1])
+            start_date = pd.to_datetime(trip_date)
+            end_date = pd.to_datetime(trip_date) + timedelta(days=(trip_period-1)) # 여행기간은 출발날짜를 포함하므로 -1
+            period = pd.date_range(start=start_date, end=end_date) # 여행하는 날짜들
 
-        period = pd.date_range(start=start_date, end=end_date)
+            sum += self.predict_tounum(period, sigungu_cd)[0] # 여행 기간 동안 지역의 평균 집중률
 
-        result = df[base_ymd.isin(period)] # 기간에 해당하는 행만 추출
-
-        if not result.empty: # 여행 기간에 해당하는 정보가 있다면
-            cnctr_rate = result['cnctrRate'].astype(float).mean() # 기간에 해당하는 동안의 집중률 평균
-
-            if cnctr_rate >= 70 :
-                return True # 집중률이 70 이상이라면 성수기로 판단
-            else:
-                return False
-
-        else: # 여행기간에 해당하는 정보가 없다면
-            return self.predict_tounum(period, sigungu_cd)
+        return sum / len(sigungu_cds) # 평균 방문률을 반환
 
     def predict_tounum(self, period, signgu_cd):
         """
         여행지의 시군구코드와 여행 기간을 입력받아 방문자 수를 예측합니다.\n
-        여행 기간 동안의 방문자 수 평균을 threshold와 비교하여 성수기 여부를 판별합니다.\n
-        반환 형식은 True | False 입니다.\n
+        여행 기간 동안의 방문자 수 평균을 평균 최저치, 최대치와 비교합니다.\n
+        최저를 0, 최대를 100으로 할 때 예측된 방문자 수의 비율을 계산해 반환합니다.\n
         period : [datetime, datetime, ...]
         """
         sum = 0
@@ -117,14 +97,9 @@ class EstimatePeak:
             if date.year >= 2027: # 2026년에 대한 방문자수 정보가 없으므로
                 temp_str = f'2026-{date.month:02d}-{date.day:02d}' # 2025년 정보를 사용하기 위해 date.year를 2026으로 설정
                 date = pd.to_datetime(temp_str)
-            result = self.tounum_per_day[(self.tounum_per_day['signguCode'] == signgu_cd) &
+            pre_year_tounum = self.tounum_per_day[(self.tounum_per_day['signguCode'] == signgu_cd) &
                                                 (self.tounum_per_day['baseYmd'] == str(date - relativedelta(years=1)))
-                                                ]['touNum']
-            if len(result) > 0:
-                pre_year_tounum = result.iloc[0]
-            else:
-                print('조건에 맞는 행을 찾을 수 없습니다')
-                return None
+                                                ]['touNum'].values[0]
             X = pd.DataFrame({
                 'signguCode' : [signgu_cd],
                 'daywkDivCd' : [date.dayofweek],
@@ -135,10 +110,10 @@ class EstimatePeak:
                 })
             sum += self.model.predict(X)
         mean_tounum = sum / len(period)
-        if mean_tounum >= self.peak_threshold[(self.peak_threshold['signguCode'] == signgu_cd)]['threshold'].values[0]:
-            return True
-        else:
-            return False
+        minmax = self.minmax_per_signgu[self.minmax_per_signgu['signguCode'] == signgu_cd]['month_touNum_mean'].values
+        min_mean, max_mean = minmax[0], minmax[1]
+
+        return (mean_tounum - min_mean) / (max_mean - min_mean)
 
     def get_holiday(self, date):
         """
@@ -209,10 +184,9 @@ class EstimatePeak:
             return 0 # 하루라도 아니라면 0
 
 if __name__=='__main__':
-    trip_date = ['20270715', '20270716']
-    destination = ['서울특별시', '중구']
+    trip_date = '20261224'
+    destination = '서울특별시'
     load_dotenv()
-
     estimate_peak = EstimatePeak()
 
-    print(estimate_peak.is_peak_season(trip_date, destination))
+    print(estimate_peak.is_peak_season(trip_date, 3, destination))

@@ -21,8 +21,8 @@ tour_df = pd.read_pickle('data/tour_df.pkl') # 데이터셋 로드
 
 final_model = ExtraTreesRegressor( # 모델 생성
             random_state=42,
-            n_estimators=200,
-            max_depth=20,
+            n_estimators=50,
+            max_depth=5,
             min_samples_leaf=2,
             n_jobs=-1
         )
