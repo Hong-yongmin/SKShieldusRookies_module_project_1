@@ -17,7 +17,7 @@ from sklearn.metrics import (
     r2_score
 )
 
-tour_df = pd.read_pickle('./../archive/tour_df.pkl') # 데이터셋 로드
+tour_df = pd.read_pickle('data/tour_df.pkl') # 데이터셋 로드
 
 final_model = ExtraTreesRegressor( # 모델 생성
             random_state=42,
@@ -138,8 +138,8 @@ print(f'R2   : {test_r2:.5f}')
 # 최종 모델 저장
 joblib.dump(
     final_pipeline,
-    f'./../archive/is_peak_model.pkl'
+    f'data/is_peak_model.pkl'
 )
 
 print('저장 완료!')
-print(f'모델: ./../archive/is_peak_model.pkl')
+print(f'모델: data/is_peak_model.pkl')

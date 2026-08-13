@@ -42,10 +42,10 @@ class EstimatePeak:
         self.holiday_url += '&solMonth={month:02d}'  # 월 지정
         self.holiday_url += '&_type=json'            # json으로 응답
 
-        self.signgu_code_info = pd.read_excel('./../archive/한국관광공사_OpenAPI_관광지_시군구_코드정보_v1.0.xlsx')
-        self.peak_threshold = pd.read_pickle('./../archive/peak_threshold.pkl') # 지역별 월 평균 방문자수
-        self.tounum_per_day = pd.read_pickle('./../archive/tounum_per_day.pkl') # 전년도 방문자수 추가용 데이터셋
-        self.model = joblib.load('./../archive/is_peak_model.pkl')
+        self.signgu_code_info = pd.read_excel('data/한국관광공사_OpenAPI_관광지_시군구_코드정보_v1.0.xlsx')
+        self.peak_threshold = pd.read_pickle('data/peak_threshold.pkl') # 지역별 월 평균 방문자수
+        self.tounum_per_day = pd.read_pickle('data/tounum_per_day.pkl') # 전년도 방문자수 추가용 데이터셋
+        self.model = joblib.load('data/is_peak_model.pkl')
         # 날짜, 지역에 따른 방문자수 예측 모델
         # signguCode, daywkDivCd, previous_year_touNum, isDayOff, isLongHoliday, year, month, day, day_of_year
 
