@@ -17,6 +17,7 @@ cycler==0.12.1
 debugpy==1.8.21
 decorator==5.3.1
 distro==1.9.0
+et_xmlfile==2.0.0
 executing==2.2.1
 filelock==3.32.2
 flatbuffers==25.12.19
@@ -60,6 +61,7 @@ nest-asyncio2==1.7.2
 networkx==3.6.1
 numpy==2.5.1
 openai==2.53.0
+openpyxl==3.1.5
 opt_einsum==3.4.0
 optree==0.19.1
 packaging==26.2
