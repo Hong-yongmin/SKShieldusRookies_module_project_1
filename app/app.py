@@ -61,16 +61,66 @@ AREA_OPTIONS = [
     '지방'
 ]
 
+
 # ==========================================
-# 코드 변환
+# 이동 정보 - 출발지, 추천 기준 범주
 # ==========================================
 
+DEPARTURE_OPTIONS = [
+    "서울",
+    "부산",
+    "대구",
+    "인천",
+    "광주",
+    "대전",
+    "울산",
+    "세종",
+    "경기",
+    "강원",
+    "충북",
+    "충남",
+    "전북",
+    "전남",
+    "경북",
+    "경남",
+    "제주",
+]
+
+OPTION_OPTIONS = {
+    "빠른 교통편": "fast",
+    "저렴한 교통편": "cheap",
+    "편한 교통편": "comfort",
+    "환승 적은 교통편": "transfer",
+    "원하는 시간대": "time",
+}
+
+
+# ==========================================
+# 함수
+# ==========================================
+
+# 코드 변환
 def get_code(label, code_dict):
     return next(
         code
         for code, value in code_dict.items()
         if value == label
     )
+
+# 소요 시간 포멧 변환 (분 -> 시간, 분)
+def format_duration(minutes):
+    if minutes is None:
+        return None
+
+    hours = minutes // 60
+    mins = minutes % 60
+
+    if hours > 0 and mins > 0:
+        return f'{hours}시간 {mins}분'
+    elif hours > 0:
+        return f'{hours}시간'
+    else:
+        return f'{mins}분'
 
 
 # ==========================================
@@ -110,9 +160,17 @@ st.caption('AI 기반 여행 추천 서비스')
 # Session State
 # ==========================================
 
+# 화면 상태 저장
+if 'current_tab' not in st.session_state:
+    st.session_state.current_tab = '여행 추천'
+
 # 추천 여행지 결과 저장
 if 'destinations' not in st.session_state:
     st.session_state.destinations = []
+
+# 선택된 여행지 저장
+if 'selected_recommendation' not in st.session_state:
+    st.session_state.selected_recommendation = None
 
 # 여행지별 정보 결과 저장
 if 'recommendation_context' not in st.session_state:
@@ -130,6 +188,29 @@ if 'trip_started' not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# ------------------------------------------
+# 항공 / 교통 추천 관련
+# ------------------------------------------
+# 이동 정보 설정 여부
+if 'transport_enabled' not in st.session_state:
+    st.session_state.transport_enabled = None
+
+# 출발 지역
+if 'departure' not in st.session_state:
+    st.session_state.departure = None
+
+# 교통편 추천 기준
+if 'transport_option' not in st.session_state:
+    st.session_state.transport_option = None
+
+# 원하는 출발 시간
+if 'time_after' not in st.session_state:
+    st.session_state.time_after = None
+
+# 항공/교통 API 요청 데이터 저장
+if 'transport_request' not in st.session_state:
+    st.session_state.transport_request = None
+
 
 # ==========================================
 # 사용자 입력 영역
@@ -141,11 +222,20 @@ st.sidebar.title('사용자 입력 조건')
 # 추천 내용 전체 초기화
 if st.sidebar.button('추천 내용 초기화'):
 
+    st.session_state.current_tab = '여행 추천'
     st.session_state.destinations = []
+    st.session_state.selected_recommendation = None
     st.session_state.recommendation_context = []
+
     st.session_state.api_context = []
     st.session_state.trip_started = False
     st.session_state.messages = []
+
+    st.session_state.transport_enabled = None
+    st.session_state.departure = None
+    st.session_state.transport_option = None
+    st.session_state.time_after = None
+    st.session_state.transport_request = None
 
     st.toast('추천 내용이 초기화 되었습니다.')
 
@@ -206,15 +296,24 @@ period = st.sidebar.number_input(
 
 
 # ==========================================
-# 메뉴 선택 ( 여행 추천 / 챗봇 )
+# 메뉴 선택 (여행 추천 / 챗봇)
 # ==========================================
 
 selected_tab = st.radio(
     '메뉴',
     ['여행 추천', 'K-Guide AI'],
     horizontal=True,
-    label_visibility='collapsed'
+    label_visibility='collapsed',
+    index=(
+        0 if st.session_state.current_tab == '여행 추천'
+        else 1
+    )
 )
+
+# Radio에서 직접 선택한 화면을 Session State에 반영
+if selected_tab != st.session_state.current_tab:
+    st.session_state.current_tab = selected_tab
+    st.rerun()
 
 
 # ==========================================
@@ -283,20 +382,31 @@ def create_dummy_api_context(destinations):
 
             'flights': [
                 {
-                    'airline': 'K-Guide 항공',
-                    'price': 85000,
+                    'transport_type': 'flight',
+                    'name': '대한항공',
+                    'departure': '김포공항',
+                    'arrival': destination,
                     'departure_time': '09:30',
                     'arrival_time': '10:40',
-                    'duration': '1시간 10분'
+                    'duration': 70,
+                    'price': 85000,
+                    'price_type': 'api',
+                    'transfers': 0
                 }
             ],
 
             'transportation': [
                 {
-                    'type': '대중교통',
-                    'route': '지하철 → 버스',
-                    'duration': '45분',
-                    'price': 1550
+                    'transport_type': 'train',
+                    'name': 'KTX',
+                    'departure': '서울역',
+                    'arrival': destination,
+                    'departure_time': '09:30',
+                    'arrival_time': '10:40',
+                    'duration': 120,
+                    'price': 50000,
+                    'price_type': 'api',
+                    'transfers': 0
                 }
             ]
         }
@@ -307,7 +417,7 @@ def create_dummy_api_context(destinations):
 
 
 # ==========================================
-# 기능 연결 - 여행 추천 결과
+# 여행 추천 결과
 # ==========================================
 
 if selected_tab == '여행 추천':
@@ -372,6 +482,7 @@ if selected_tab == '여행 추천':
 
                 # ==========================================
                 # API 더미 데이터 생성
+                # ------------------------------------------
                 st.write('여행 정보 준비 중...')
                 st.session_state.api_context = (
                     create_dummy_api_context(
@@ -435,6 +546,63 @@ if selected_tab == '여행 추천':
                 else:
                     st.info('예상 경비를 확인할 수 없습니다.')
 
+                # 계획 생성할 여행지 선택
+                if st.button(
+                    '이 여행지로 여행 계획 만들기',
+                    key=f'plan_{destination}'
+                ):
+                    st.session_state.selected_recommendation = recommendation
+                    st.session_state.current_tab = 'K-Guide AI'
+                    st.rerun()
+
+
+# ==========================================
+# OpenAI 챗봇
+# ==========================================
+
+elif selected_tab == 'K-Guide AI':
+
+    st.header("K-Guide AI")
+    st.caption('여행에 대해 궁금한 점 자유롭게 질문')
+
+
+    # 선택된 여행지 정보
+    selected_recommendation = (
+        st.session_state.selected_recommendation
+    )
+
+
+
+    # 선택된 여행지 정보 출력
+
+    if selected_recommendation is not None:
+
+        st.info(
+            f"현재 선택한 여행지: "
+            f"{selected_recommendation['destination']}"
+        )
+
+        st.write(
+            f"예상 경비: "
+            f"{selected_recommendation['expense']:,}원"
+        )
+
+        if selected_recommendation['peak_season']:
+            st.write('성수기')
+        else:
+            st.write('비수기')
+
+        # ==========================================
+        # 사용자 기본 조건 전달 테스트
+        # ------------------------------------------
+        # st.write('선택 여행지:', selected_recommendation)
+        # st.write('출발 날짜:', trip_date)
+        # st.write('여행 기간:', period)
+        # st.write('테마:', theme)
+        # st.write('인원:', num_of_people)
+        # ==========================================
+
+        
         # ==========================================
         # 기능 연걸 - 기타 정보
         # ==========================================
@@ -446,15 +614,28 @@ if selected_tab == '여행 추천':
 
         col1, col2 = st.columns(2)
 
+        # API 더미 데이터
+        api_context = st.session_state.api_context
+
+        # 현재 선택한 여행지
+        selected_destination = selected_recommendation['destination']
+
+        # 선택한 여행지에 해당하는 API 데이터 찾기
+        selected_api_context = next(
+            (
+                data for data in api_context
+                if data['destination'] == selected_destination
+            ),
+            None
+        )
+
         # 숙소
         with col1:
             st.subheader('추천 숙소')
 
-            api_context = st.session_state.api_context
+            if selected_api_context:
 
-            if api_context:
-
-                hotel_list = api_context[0].get('accommodations', [])
+                hotel_list = selected_api_context.get('accommodations', [])
 
                 if hotel_list:
 
@@ -495,9 +676,9 @@ if selected_tab == '여행 추천':
         with col2:
             st.subheader('추천 맛집')
             
-            if api_context:
+            if selected_api_context:
 
-                restaurant_list = api_context[0].get('restaurants', [])
+                restaurant_list = selected_api_context.get('restaurants', [])
 
                 if restaurant_list:
 
@@ -549,9 +730,9 @@ if selected_tab == '여행 추천':
         with col1:
             st.subheader('날씨 정보')
 
-            if api_context:
+            if selected_api_context:
 
-                weather = api_context[0].get('weather', {})
+                weather = selected_api_context.get('weather', {})
 
                 if weather:
                     # 기온
@@ -576,9 +757,9 @@ if selected_tab == '여행 추천':
         with col2:
             st.subheader('추천 관광지')
 
-            if api_context:
+            if selected_api_context:
 
-                attraction_list = api_context[0].get(
+                attraction_list = selected_api_context.get(
                     'attractions',
                     []
                 )
@@ -623,81 +804,197 @@ if selected_tab == '여행 추천':
             else:
                 st.info('관광지 정보를 불러오는 중입니다.')
 
-        # 항공편, 교통편
-        st.header('항공편, 교통편')
 
-        col1, col2 = st.columns(2)
+        # ==========================================
+        # 항공 / 교통 정보 설정
+        # ==========================================   
+        
+        if (
+            selected_recommendation is not None
+            and st.session_state.transport_enabled is None
+        ):
+            st.subheader('이동 정보 설정')
 
-        # 항공편
-        with col1:
-            st.subheader('항공편')
+            st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
 
-            if api_context:
 
-                flights = api_context[0].get(
-                    'flights',
-                    []
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                departure = st.selectbox(
+                    '출발 지역',
+                    DEPARTURE_OPTIONS
                 )
 
-                if flights:
+            with col2:
 
-                    flight = flights[0]
-                    # 항공사
-                    st.info(flight['airline'])
-                    # 가격
-                    st.write(f"가격: {flight['price']:,}원")
-                    # 출발 시간
-                    st.write(f"출발: {flight['departure_time']}")
-                    # 도착 시간
-                    st.write(f"도착: {flight['arrival_time']}")
-                    # 소요 시
-                    st.write(f"소요 시간: {flight['duration']}")
+                arrival = selected_recommendation['destination']
 
-                else:
-                    st.info('항공편 정보가 없습니다.')
-
-            else:
-                st.info('항공편 정보를 불러오는 중입니다.')
-
-
-        # 교통편
-        with col2:
-            st.subheader('교통편')
-
-            if api_context:
-
-                transportation = api_context[0].get(
-                    'transportation',
-                    []
+                st.text_input(
+                    '도착 지역',
+                    value=arrival,
+                    disabled=True
                 )
 
-                if transportation:
+            transport_option_label = st.selectbox(
+                '교통편 추천 기준',
+                list(OPTION_OPTIONS.keys())
+            )
 
-                    transport = transportation[0]
-                    # 교통수단
-                    st.info(transport['type'])
-                    # 이동경로
-                    st.write(f"경로: {transport['route']}")
-                    # 소요시간
-                    st.write(f"소요 시간: {transport['duration']}")
-                    # 요금
-                    st.write(f"요금: {transport['price']:,}원")
+            use_time_filter = st.checkbox(
+                '원하는 출발 시간 설정'
+            )
 
-                else:
-                    st.info('교통편 정보가 없습니다.')
+            if use_time_filter:
+
+                time_after = st.time_input(
+                    '이 시간 이후 출발',
+                    value=None
+                )
 
             else:
-                st.info('교통편 정보를 불러오는 중입니다.')
+
+                time_after = None
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                if st.button(
+                    '입력하고 추천받기',
+                    use_container_width=True
+                ):
+
+                    st.session_state.transport_enabled = True
+
+                    st.session_state.departure = departure
+
+                    st.session_state.transport_option = (
+                        OPTION_OPTIONS[transport_option_label]
+                    )
+
+                    st.session_state.time_after = (
+                        time_after.strftime('%H:%M')
+                        if time_after is not None
+                        else None
+                    )
+
+                    # API 요청 데이터
+                    st.session_state.transport_request = {
+                        'departure': departure,
+                        'arrival': selected_recommendation['destination'],
+                        'option': OPTION_OPTIONS[transport_option_label],
+                        'time_after': (
+                            time_after.strftime('%H:%M')
+                            if time_after is not None
+                            else None
+                        )
+                    }
+                    st.rerun()
+
+            with col2:
+
+                if st.button(
+                    '건너뛰기',
+                    use_container_width=True
+                ):
+
+                    st.session_state.transport_enabled = False
+                    st.session_state.departure = None
+                    st.session_state.transport_option = None
+                    st.session_state.time_after = None
+                    st.session_state.transport_request = None
+
+                    st.rerun()
+
+        if st.session_state.transport_enabled:
+            # 항공편, 교통편
+            st.header('항공편, 교통편')
+
+            col1, col2 = st.columns(2)
+
+            # 항공편
+            with col1:
+                st.subheader('항공편')
+
+                if selected_api_context:
+
+                    flights = selected_api_context.get(
+                        'flights',
+                        []
+                    )
+
+                    if flights:
+
+                        flight = flights[0]
+
+                        # 항공사
+                        st.info(flight['name'])
+
+                        # 출발 / 도착
+                        st.write(f"{flight['departure']} ➤ {flight['arrival']}")
+
+                        # 출발 / 도착 시간
+                        st.write(f"출발: {flight['departure_time']}")
+                        st.write(f"도착: {flight['arrival_time']}")
+
+                        # 소요 시간
+                        if flight['duration'] is not None:
+                            st.write(f"소요 시간: {format_duration(flight['duration'])}")
+
+                        # 가격
+                        if flight['price'] is not None:
+                            st.write(f"가격: {flight['price']:,}원")
+
+                    else:
+                        st.info('항공편 정보가 없습니다.')
+
+                else:
+                    st.info('항공편 정보를 불러오는 중입니다.')
 
 
-# ==========================================
-# OpenAI 챗봇
-# ==========================================
+            # 교통편
+            with col2:
+                st.subheader('교통편')
 
-elif selected_tab == 'K-Guide AI':
+                if selected_api_context:
 
-    st.header("K-Guide AI")
-    st.caption('여행에 대해 궁금한 점 자유롭게 질문')
+                    transportation = selected_api_context.get(
+                        'transportation',
+                        []
+                    )
+
+                    if transportation:
+
+                        transport = transportation[0]
+                        # 교통수단
+                        st.info(transport['name'])
+
+                        # 교통수단 종류
+                        st.write(f"교통수단: {transport['transport_type']}")
+                        
+                        # 출발 / 도착
+                        st.write(f"{transport['departure']} ➤ {transport['arrival']}")
+
+                        # 출발 / 도착 시간
+                        st.write(f"출발: {transport['departure_time']}")
+                        st.write(f"도착: {transport['arrival_time']}")
+
+                        # 소요 시간
+                        if transport['duration'] is not None:
+                            st.write(f"소요 시간: {format_duration(transport['duration'])}")
+
+                        # 가격
+                        if transport['price'] is not None:
+                            st.write(f"가격: {transport['price']:,}원")
+
+                    else:
+                        st.info('교통편 정보가 없습니다.')
+
+                else:
+                    st.info('교통편 정보를 불러오는 중입니다.')
+
 
     # 대화 기록 출력
     for message in st.session_state.messages:
@@ -720,7 +1017,7 @@ elif selected_tab == 'K-Guide AI':
             
         # ==========================================
         # UI 테스트용 출력
-
+        # ------------------------------------------
             answer = 'K-Guide AI가 여행 정보를 분석하고 있습니다.'
             st.markdown(answer)
 
