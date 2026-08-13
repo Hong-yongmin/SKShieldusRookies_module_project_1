@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 
 from modules.functions import recommend_destination, is_peak_season, estimate_expense
+from model.estimate_peak import EstimatePeak
 
 # ==========================================
 # 입력값 코드
@@ -135,6 +136,11 @@ if not api_key:
     st.stop()
 
 client = OpenAI(api_key=api_key)
+
+# ==========================================
+# 객체 선언
+# ==========================================
+estimate_peak = EstimatePeak()
 
 
 # ==========================================
@@ -444,7 +450,7 @@ if selected_tab == '여행 추천':
                 for destination in st.session_state.destinations:
                     # 성수기 / 비수기
                     try:
-                        peak = is_peak_season(
+                        peak = estimate_peak.is_peak_season(
                             trip_date,
                             period,
                             destination
@@ -520,10 +526,14 @@ if selected_tab == '여행 추천':
                 st.subheader(destination)
 
                 # 성수기 / 비수기 표시
-                if peak is True:
-                    st.warning('성수기입니다.')
-                elif peak is False:
-                    st.success('비수기입니다.')
+                if peak >= 0.75:
+                    st.warning('매우 혼잡할 것으로 예상됩니다.')
+                elif peak >= 0.5:
+                    st.warning('혼잡할 것으로 예상됩니다.')
+                elif peak >= 0.25:
+                    st.success('한적할 것으로 예상됩니다.')
+                elif peak < 0.25 :
+                    st.success('매우 한적할 것으로 예상됩니다.')
                 else:
                     st.info('성수기 여부를 확인할 수 없습니다.')
 
