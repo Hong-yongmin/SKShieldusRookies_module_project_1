@@ -625,10 +625,16 @@ elif selected_tab == 'K-Guide AI':
             f"{selected_recommendation['expense']:,}원"
         )
 
-        if selected_recommendation['peak_season']:
-            st.write('성수기')
+        if selected_recommendation['peak_season'] >= 0.75:
+            st.write('매우 혼잡')
+        elif selected_recommendation['peak_season'] >= 0.5:
+            st.write('혼잡')
+        elif selected_recommendation['peak_season'] >= 0.25:
+            st.write('한적')
+        elif selected_recommendation['peak_season'] < 0.25:
+            st.write('매우 한적')
         else:
-            st.write('비수기')
+            st.write('성수기 정보 확인 불가')
 
         # ==========================================
         # 사용자 기본 조건 전달 테스트
@@ -1069,7 +1075,9 @@ elif selected_tab == 'K-Guide AI':
 
             #     tools=[
             #         {
-            #             "type": "web_search"
+            #             "type": "web_search",
+            #             "search_context_size": "low", # 수집 정보 크기 최소화로 비용 절감
+            #             "return_token_budget": 2000   # 검색 전용 토큰 한도를 제한하여 비용 폭증 방어
             #         }
             #     ],
             
@@ -1090,9 +1098,13 @@ elif selected_tab == 'K-Guide AI':
             #     최신 정보가 필요한 경우 웹 검색을 활용하세요.
             #     특히 날씨, 운영시간, 가격, 숙소, 맛집, 관광지, 교통편 등
             #     현재 정보가 중요한 질문의 경우에는 웹 검색을 우선으로 활용하세요.
+            #     매우 중요: 첫 번째 시도가 실패하더라도 유사한 검색 쿼리를 반복하지 마십시오.
+            #     1~2회 검색 내에 정확한 정보를 찾을 수 없는 경우,
+            #     검색을 중단하고 보유한 데이터를 바탕으로 최선의 답변을 제공하십시오.
             #     ''',
             #     input=st.session_state.messages,
-            #     stream=True
+            #     stream=True,
+            #     max_output_tokens=1500
             # )
 
             # # 스트리밍 청크 생성 함수

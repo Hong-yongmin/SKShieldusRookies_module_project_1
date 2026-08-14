@@ -3,4 +3,5 @@
 venv/
 .env
 *.ipynb
+peak_model_fit.py
 __pycache__
