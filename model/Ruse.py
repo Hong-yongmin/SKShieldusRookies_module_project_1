@@ -47,12 +47,7 @@ def get_destination_probabilities(user_data):
 
             # 현재 지역의 방문값 1에 해당하는 확률만 가져오기
             probabilities.append(
-                float(
-                    probability[
-                        0,
-                        classes.index(1)
-                    ]
-                )
+                float(probability[0, classes.index(1)])
             )
 
         # 학습 데이터에 현재 지역 방문자가 한 명도 없었던 특수한 경우
@@ -94,24 +89,6 @@ def check_inputs(gender, age, num_of_people, theme, preferred_area, top_n):
     if top_n < 1:
         raise ValueError('추천 개수는 1개 이상이어야 합니다.')
 
-
-# 숫자 예측값을 UI용 추천도로 변환
-
-def get_recommendation_level(rank):
-    """
-    선택 권역의 최고 예측값과 비교한 상대 추천도이다.
-    모델 순위와 숫자 score는 변경하지 않고 화면 표시용으로만 사용한다.
-    """
-
-    if rank == 1:
-        return "최우선 추천"
-
-    if rank == 2:
-        return "추천"
-
-    return "함께 고려"
-
-
 # 여행 목적지 추천
 
 def recommend_destination(
@@ -125,30 +102,17 @@ def recommend_destination(
     """
     성별, 연령대, 인원수, 테마와 희망 권역을 입력받아
     모델 예측값이 높은 지역을 반환한다.
-
     score는 다른 기능에서 사용할 숫자 예측값이고,
-    recommendation_level은 Streamlit 화면에 표시할 추천도이다.
     """
 
     # 모델을 실행하기 전에 모든 사용자 입력값 검사
-    check_inputs(
-        gender,
-        age,
-        num_of_people,
-        theme,
-        preferred_area,
-        top_n
-    )
+    check_inputs(gender, age, num_of_people, theme, preferred_area, top_n)
 
     # 사용자 입력을 학습 모델과 동일한 원핫 인코딩 형태로 만든다.
 
     # 모든 입력값이 0인 한 행짜리 DataFrame 생성
     # 열의 종류와 순서는 모델 학습 당시 feature_columns와 동일함
-    user_data = pd.DataFrame(
-        0,
-        index=[0],
-        columns=feature_columns
-    )
+    user_data = pd.DataFrame(0, index=[0], columns=feature_columns)
 
     # 사용자가 선택한 조건에 해당하는 원핫 인코딩 열 이름 생성
     selected_features = [
@@ -188,23 +152,15 @@ def recommend_destination(
     # 희망 권역은 모델 입력값이 아니라 추천 후보를 제한하는 필터이다.
 
     # 수도권으로 분류할 3개 지역
-    capital = [
-        '서울특별시',
-        '경기도',
-        '인천광역시'
-    ]
+    capital = ['서울특별시', '경기도', '인천광역시']
 
     # 수도권을 선택한 경우 세 지역만 추천 후보로 유지
     if preferred_area == '수도권':
-        result = result[
-            result['destination'].isin(capital)
-        ].copy()
+        result = result[result['destination'].isin(capital)].copy()
 
     # 지방을 선택한 경우 수도권 세 지역을 추천 후보에서 제외
     elif preferred_area == '지방':
-        result = result[
-            ~result['destination'].isin(capital)
-        ].copy()
+        result = result[~result['destination'].isin(capital)].copy()
 
     # 전체를 선택한 경우에는 별도의 필터 없이 17개 지역 모두 유지
 
@@ -215,17 +171,10 @@ def recommend_destination(
     # 모델 예측값으로만 순위를 정하며 별도 가중치로 순서를 바꾸지 않는다.
 
     # 방문 가능성이 높은 지역부터 내림차순 정렬
-    result = result.sort_values(
-        'probability',
-        ascending=False
-    )
+    result = result.sort_values('probability', ascending=False)
 
     # 정렬 결과에서 사용자가 요청한 개수만큼 선택
-    result = (
-        result
-        .head(top_n)
-        .reset_index(drop=True)
-    )
+    result = (result.head(top_n).reset_index(drop=True))
 
     # 최종 반환 결과를 저장할 목록
     recommendations = []
@@ -234,9 +183,7 @@ def recommend_destination(
     for index, row in result.iterrows():
 
         # 현재 지역의 모델 예측값
-        probability = float(
-            row['probability']
-        )
+        probability = float(row['probability'])
 
         rank = index + 1
 
@@ -245,21 +192,11 @@ def recommend_destination(
             'rank': rank,
 
             # 추천 지역 공식 명칭
-            'destination': str(
-                row['destination']
-            ),
-
+            'destination': str(row['destination']),
+            
             # 모델 원본 예측값을 100배 한 숫자
-            # 다른 기능 또는 내부 확인용
-            'score': round(
-                probability * 100,
-                1
-            ),
-
-            # Streamlit에서 사용자에게 표시할 문자 추천도
-            'recommendation_level': get_recommendation_level(
-                rank
-            )
+            # 내부 코드용
+            'score': round(probability * 100, 1)
         })
 
     # 최종 추천 결과 반환
@@ -270,7 +207,6 @@ def recommend_destination(
 # 이 파일을 직접 실행했을 때만 아래 테스트 코드가 실행됨.
 # 다른 파일에서 import 시, 실행되지 않음
 if __name__ == '__main__':
-
     sample_result = recommend_destination(
         gender=1,
         age=2,
@@ -279,11 +215,10 @@ if __name__ == '__main__':
         preferred_area='지방',
         top_n=3
     )
-    print('| 순위 | 추천 지역 | 선호 추천도 |')
+    print('| 순위 | 추천 지역 |')
 
     for item in sample_result:
         print(
             f"| {item['rank']} "
             f"| {item['destination']} "
-            f"| {item['recommendation_level']} |"
         )
