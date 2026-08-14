@@ -35,13 +35,7 @@ DESTINATIONS = [
 ]
 
 # 모델 학습 전, 반드시 존재해야 하는 입력 열과 정답 열
-required_columns = [
-    'year',
-    'D_SEX',
-    'D_AGE',
-    'RQ7_1',
-    'Q3_1a1'
-] + TARGET_COLUMNS
+required_columns = ['year', 'D_SEX', 'D_AGE', 'RQ7_1', 'Q3_1a1'] + TARGET_COLUMNS
 
 # 필요한 열 중 실제 데이터에 존재하지 않는 열 확인
 missing_columns = [column for column in required_columns if column not in df]
@@ -151,17 +145,13 @@ def get_probabilities(model, input_data):
         if 1 in classes:
 
             # 미방문 확률은 제외하고 방문값 1의 확률만 저장
-            positive_probabilities.append(
-                probabilities[:, classes.index(1)]
-            )
+            positive_probabilities.append(probabilities[:, classes.index(1)])
 
         # 학습 데이터에 해당 지역 방문자가 전혀 없는 특수한 경우
         else:
 
             # 방문 가능성을 전부 0으로 설정
-            positive_probabilities.append(
-                np.zeros(len(input_data))
-            )
+            positive_probabilities.append(np.zeros(len(input_data)))
 
     # 지역별로 분리된 결과를 하나의 2차원 배열로 합침
     # 결과 형태: 관광객 수 × 17개 지역
@@ -184,9 +174,7 @@ def calculate_hit_rate(probabilities, actual, top_n=3):
     for row_index, predicted_indexes in enumerate(top_indexes):
 
         # 현재 관광객의 실제 방문값이 1인 지역 위치 찾기
-        actual_indexes = np.where(
-            actual.iloc[row_index].to_numpy() == 1
-        )[0]
+        actual_indexes = np.where(actual.iloc[row_index].to_numpy() == 1)[0]
 
         # 추천 지역과 실제 방문 지역에 하나라도 같은 지역이 있는지 확인
         if set(predicted_indexes) & set(actual_indexes):
@@ -216,34 +204,18 @@ def evaluate_model(model_name, model, training_time):
 
         # 전체 지역의 0/1 예측 결과를 합쳐 계산한 F1 점수
         # 방문 건수가 많은 지역의 영향을 상대적으로 많이 받음
-        'micro_f1': f1_score(
-            y_test,
-            predicted,
-            average='micro',
-            zero_division=0
-        ),
+        'micro_f1': f1_score(y_test, predicted, average='micro', zero_division=0),
 
         # 17개 지역의 F1 점수를 각각 구한 다음 동일한 비중으로 평균
         # 방문자가 적은 지역의 성능도 함께 확인할 수 있음
-        'macro_f1': f1_score(
-            y_test,
-            predicted,
-            average='macro',
-            zero_division=0
-        ),
+        'macro_f1': f1_score(y_test, predicted, average='macro', zero_division=0),
 
         # 전체 0/1 예측 중 실제값과 다르게 예측한 비율
         # 값이 낮을수록 좋음
-        'hamming_loss': hamming_loss(
-            y_test,
-            predicted
-        ),
+        'hamming_loss': hamming_loss(y_test, predicted),
 
         # 추천 TOP 3 중 실제 방문 지역이 하나 이상 포함된 관광객의 비율
-        'hit_rate_at_3': calculate_hit_rate(
-            probabilities,
-            y_test
-        ),
+        'hit_rate_at_3': calculate_hit_rate(probabilities, y_test),
 
         # 모델 학습에 걸린 시간
         'training_time_seconds': training_time
@@ -425,9 +397,9 @@ result_df['improvement_over_popular'] = (
 # 아래 평가 기준 순서대로 가장 좋은 모델이 위로 오도록 정렬
 result_df = result_df.sort_values(
     [
+        'hit_rate_at_3',  # TOP 3 추천 성공률: 높을수록 좋음
         'macro_f1',       # 지역별 성능 평균: 높을수록 좋음
         'micro_f1',       # 전체 예측 성능: 높을수록 좋음
-        'hit_rate_at_3',  # TOP 3 추천 성공률: 높을수록 좋음
         'hamming_loss'    # 틀린 예측 비율: 낮을수록 좋음
     ],
     ascending=[
