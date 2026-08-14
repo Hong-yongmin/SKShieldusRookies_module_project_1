@@ -450,16 +450,17 @@ if selected_tab == '여행 추천':
                 recommendation_context=[]
 
                 for destination in st.session_state.destinations:
-                    # 성수기 / 비수기
-                    try:
-                        peak = estimate_peak.is_peak_season(
-                            trip_date,
-                            period,
-                            destination
-                        )
-                    except Exception:
-                        peak = None
-
+# 성수기 여부 표시 위치 변경 예정 --------------------------------
+                    # # 성수기 / 비수기
+                    # try:
+                    #     peak = estimate_peak.is_peak_season(
+                    #         trip_date,
+                    #         period,
+                    #         destination
+                    #     )
+                    # except Exception:
+                    #     peak = None
+#---------------------------------------------------------------
                     # 예상 경비
                     try:
                         expense = estimate_expense(
@@ -474,7 +475,6 @@ if selected_tab == '여행 추천':
 
                     recommendation_context.append({
                         'destination': destination,
-                        'peak_season': peak,
                         'expense': expense
                     })
 
@@ -523,23 +523,23 @@ if selected_tab == '여행 추천':
             with cols[i]:
 
                 destination = recommendation['destination']
-                peak = recommendation['peak_season']
                 expense = recommendation['expense']
 
                 st.subheader(destination)
-
-                # 성수기 / 비수기 표시
-                if peak >= 0.75:
-                    st.warning('매우 혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.5:
-                    st.warning('혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.25:
-                    st.success('한적할 것으로 예상됩니다.')
-                elif peak < 0.25 :
-                    st.success('매우 한적할 것으로 예상됩니다.')
-                else:
-                    st.info('성수기 여부를 확인할 수 없습니다.')
-
+# 성수기 여부 표시 위치 변경 예정 --------------------------------
+                # peak = recommendation['peak_season']
+                # # 성수기 / 비수기 표시
+                # if peak >= 0.75:
+                #     st.warning('매우 혼잡할 것으로 예상됩니다.')
+                # elif peak >= 0.5:
+                #     st.warning('혼잡할 것으로 예상됩니다.')
+                # elif peak >= 0.25:
+                #     st.success('한적할 것으로 예상됩니다.')
+                # elif peak < 0.25 :
+                #     st.success('매우 한적할 것으로 예상됩니다.')
+                # else:
+                #     st.info('성수기 여부를 확인할 수 없습니다.')
+#---------------------------------------------------------------
                 # 예상 경비
                 if expense is not None:
                     st.metric(
@@ -589,17 +589,18 @@ elif selected_tab == 'K-Guide AI':
             f"예상 경비: "
             f"{selected_recommendation['expense']:,}원"
         )
-
-        if selected_recommendation['peak_season'] >= 0.75:
-            st.write('매우 혼잡')
-        elif selected_recommendation['peak_season'] >= 0.5:
-            st.write('혼잡')
-        elif selected_recommendation['peak_season'] >= 0.25:
-            st.write('한적')
-        elif selected_recommendation['peak_season'] < 0.25:
-            st.write('매우 한적')
-        else:
-            st.write('성수기 정보 확인 불가')
+# 성수기 여부 표시 위치 변경 예정 --------------------------------
+        # if selected_recommendation['peak_season'] >= 0.75:
+        #     st.write('매우 혼잡')
+        # elif selected_recommendation['peak_season'] >= 0.5:
+        #     st.write('혼잡')
+        # elif selected_recommendation['peak_season'] >= 0.25:
+        #     st.write('한적')
+        # elif selected_recommendation['peak_season'] < 0.25:
+        #     st.write('매우 한적')
+        # else:
+        #     st.write('성수기 정보 확인 불가')
+#--------------------------------------------------------------
 
         # ==========================================
         # 사용자 기본 조건 전달 테스트
@@ -782,6 +783,19 @@ elif selected_tab == 'K-Guide AI':
                     st.write(f"테마: {attraction['category']}")
                     # 설명
                     st.write(attraction['description'])
+                    # 예상 혼잡도
+                    congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
+                    st.write('예상 혼잡도 :')
+                    if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
+                        st.write('혼잡도를 예상할 수 없습니다')
+                    elif congestion_rate >= 0.75:
+                        st.write('매우 혼잡')
+                    elif congestion_rate >= 0.5:
+                        st.write('혼잡')
+                    elif congestion_rate >= 0.25:
+                        st.write('한적')
+                    else:
+                        st.write('매우 한적')
                     # 별점
                     st.write(f"별점: {attraction['rating']}")
                     # 주소
