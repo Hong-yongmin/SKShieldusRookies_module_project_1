@@ -216,6 +216,7 @@ def generate_gpt_response(user_prompt, location_name, weather_summary, accommoda
         "   - 🔗 [카카오맵으로 위치 확인하기](링크)\n"
     )
     
+    
     acc_text = ""
     if accommodations:
         acc_text = "주변 추천 숙소 목록:\n"
