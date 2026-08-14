@@ -2,7 +2,7 @@
 예상경비 모델 - 학습 전용 스크립트
 
 이 파일은 딱 한 번(또는 데이터/모델 바뀔 때만) 실행합니다.
-실행하면 model/model_final.pkl, model/x_columns.pkl 이 생성됩니다.
+실행하면 data/model_final.pkl, data/x_columns.pkl 이 생성됩니다.
 UI팀은 estimate_expense.py만 있으면 됩니다.
 
 실행 방법 (프로젝트 루트에서):
@@ -70,20 +70,20 @@ theme_flag_cols = [f'theme_{i}' for i in range(1, 18)]
 # ══════════════════════════════════════
 # 4. 국적 → 대륙권
 # ══════════════════════════════════════
-nat_map = codebook_map[codebook_map['변수명'] == 'D_NAT'].set_index('코드')['코드값 설명'].to_dict()
-tourist['국적_라벨'] = tourist['D_NAT'].map(nat_map)
+#nat_map = codebook_map[codebook_map['변수명'] == 'D_NAT'].set_index('코드')['코드값 설명'].to_dict()
+#tourist['국적_라벨'] = tourist['D_NAT'].map(nat_map)
 
-continent_map = {
-    '중국': '동아시아', '일본': '동아시아', '대만': '동아시아', '홍콩': '동아시아', '몽골': '동아시아',
-    '태국': '동남아', '베트남': '동남아', '말레이시아': '동남아', '싱가포르': '동남아',
-    '필리핀': '동남아', '인도네시아': '동남아',
-    '미국': '북미', '캐나다': '북미',
-    '영국': '유럽', '독일': '유럽', '프랑스': '유럽', '러시아': '유럽',
-    '호주': '오세아니아', '인도': '남아시아', '중동': '중동', '기타': '기타'
-}
-tourist['대륙'] = tourist['국적_라벨'].map(continent_map)
-continent_onehot = pd.get_dummies(tourist['대륙'], prefix='대륙')
-tourist = pd.concat([tourist, continent_onehot], axis=1)
+# continent_map = {
+    #'중국': '동아시아', '일본': '동아시아', '대만': '동아시아', '홍콩': '동아시아', '몽골': '동아시아',
+    #'태국': '동남아', '베트남': '동남아', '말레이시아': '동남아', '싱가포르': '동남아',
+    #'필리핀': '동남아', '인도네시아': '동남아',
+    #'미국': '북미', '캐나다': '북미',
+    #'영국': '유럽', '독일': '유럽', '프랑스': '유럽', '러시아': '유럽',
+    #'호주': '오세아니아', '인도': '남아시아', '중동': '중동', '기타': '기타'
+#}
+#tourist['대륙'] = tourist['국적_라벨'].map(continent_map)
+#continent_onehot = pd.get_dummies(tourist['대륙'], prefix='대륙')
+#tourist = pd.concat([tourist, continent_onehot], axis=1)
 
 
 # ══════════════════════════════════════
@@ -97,7 +97,7 @@ w_data = tourist['weight']
 # 6. X_data 최종 정리
 # ══════════════════════════════════════
 drop_cols = (
-    ['pnid', 'Q1', 'TYP', 'D_NAT', '국적_라벨', '대륙', 'weight']
+    ['pnid', 'Q1', 'TYP', 'D_NAT', 'weight']
     + y_raw_cols
     + [f'Q9_2a{str(i).zfill(2)}' for i in range(1, 18)]
     + [f'Q8a{str(i).zfill(2)}' for i in range(1, 21)]
