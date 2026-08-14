@@ -3,7 +3,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-from modules.functions import recommend_destination, is_peak_season, estimate_expense
+from modules.functions import recommend_destination, estimate_expense
 from model.estimate_peak import EstimatePeak
 
 # ==========================================
