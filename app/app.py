@@ -2,8 +2,15 @@ import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import sys
+from pathlib import Path
 
-from modules.functions import recommend_destination, is_peak_season, estimate_expense
+# 프로젝트 루트 경로 추가
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from model.estimate_peak import EstimatePeak
 
 # ==========================================
@@ -317,10 +324,27 @@ if selected_tab != st.session_state.current_tab:
 
 
 # ==========================================
-# 더미 API 데이터
-# 실제 API 연결 전 UI 테스트를 위한 더미 데이터
+# 더미 데이터
+# 실제 모델 연결 전 UI 테스트를 위한 더미 데이터
 # ==========================================
 
+# 여행지 추천
+def recommend_destination(gender, age, theme, num_of_people):
+	"""
+	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
+	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
+	"""
+	return ['서울특별시',  '인천광역시', '부산광역시']
+
+# 예상 경비
+def estimate_expense(period, destination, num_of_people, theme):
+	"""
+	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
+	1인당 1일 예상 경비를 예측해 반환합니다.
+	"""
+	return 300000
+
+# API
 def create_dummy_api_context(destinations):
 
     api_context = []
@@ -455,8 +479,16 @@ if selected_tab == '여행 추천':
                             period,
                             destination
                         )
-                    except Exception:
-                        peak = None
+
+                        # st.write(
+                        #     f'[DEBUG] {destination} → peak={peak}, type={type(peak)}'
+                        # )
+
+                    except Exception as e:
+                        # st.error(
+                        #     f'[DEBUG] {destination} 성수기 모델 호출 오류: {e}'
+                        # )
+                        peak = None # 모델 호출 결과가 None인 경우 UI 오류 방지를 위해 예외 처리
 
                     # 예상 경비
                     try:
@@ -503,6 +535,10 @@ if selected_tab == '여행 추천':
             except Exception as e:
                 st.error(f'여행지 추천 중 오류가 발생했습니다. : {e}')    
 
+    # ==========================================
+    # 여행 추천 결과 출력
+    # 여행지 후보 / 성수기/비수기 / 예상경비
+    # ==========================================
     if st.session_state.trip_started:
 
         st.header('추천 여행지')
@@ -526,7 +562,9 @@ if selected_tab == '여행 추천':
                 st.subheader(destination)
 
                 # 성수기 / 비수기 표시
-                if peak >= 0.75:
+                if peak is None:    # 성수기 판별 결과가 없는 경우 안내 문구 출력
+                    st.info('성수기 여부를 확인할 수 없습니다.')
+                elif peak >= 0.75:
                     st.warning('매우 혼잡할 것으로 예상됩니다.')
                 elif peak >= 0.5:
                     st.warning('혼잡할 것으로 예상됩니다.')
