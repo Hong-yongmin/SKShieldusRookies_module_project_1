@@ -171,6 +171,14 @@ def select_diverse(df, count=3):
 # ============================================================
 # 3. OpenAI Function Calling (커스텀 툴 및 호출)
 # ============================================================
+def get_description_template(region, category, is_food=False):
+    """
+    관광지 및 맛집 설명을 위한 템플릿 생성 함수
+    """
+    if is_food:
+        return f"{region} 현지 분위기를 느낄 수 있는 추천 {category} 맛집/카페입니다."
+    return f"{region}에서 즐기기 좋은 대표적인 {category} 명소입니다."
+
 def recommend_places(region, theme, age="20대", group="1명", sex="남성"):
     normalized_region = normalize_region(region)
     if not normalized_region:
@@ -204,11 +212,11 @@ def recommend_places(region, theme, age="20대", group="1명", sex="남성"):
     # 🔹 [요청사항 반영] JSON 반환 결과에 description 필드 생성
     if not tour_df.empty:
         tour_df["description"] = tour_df.apply(
-            lambda r: f"{normalized_region}에서 즐기기 좋은 대표적인 {r['category']} 명소입니다.", axis=1
+            lambda r: get_description_template(normalized_region, r['category']), axis=1
         )
     if not food_df.empty:
         food_df["description"] = food_df.apply(
-            lambda r: f"{normalized_region} 현지 분위기를 느낄 수 있는 추천 {r['category']} 맛집/카페입니다.", axis=1
+            lambda r: get_description_template(normalized_region, r['category'], is_food=True), axis=1
         )
 
     return json.dumps({
@@ -370,7 +378,7 @@ if __name__ == "__main__":
         {"role": "assistant", "content": welcome_msg}
     ]
 
-    # 4. 대화 루프 시작
+    # 4. 대화 루프 시작 (반드시 여기서 사용자의 입력을 기다려야 합니다)
     while True:
         user_input = input("\n👤 사용자: ").strip()
         
