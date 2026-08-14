@@ -80,3 +80,38 @@ def build_place_itinerary(
         })
 
     return itinerary
+
+
+def extract_places(recommendations):
+    """
+    추천 결과를 장소 간 교통 조회에 사용할 형태로 변환합니다.
+
+    추천 API의 좌표:
+    mapx = 경도
+    mapy = 위도
+
+    교통 함수에서 사용하는 좌표:
+    longitude = 경도
+    latitude = 위도
+    """
+
+    places = []
+
+    for item in recommendations:
+        name = item.get("name")
+        mapx = item.get("mapx")
+        mapy = item.get("mapy")
+
+        if not name:
+            continue
+
+        if mapx in (None, "") or mapy in (None, ""):
+            continue
+
+        places.append({
+            "name": name,
+            "latitude": float(mapy),
+            "longitude": float(mapx),
+        })
+
+    return places
