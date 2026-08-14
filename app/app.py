@@ -587,10 +587,16 @@ elif selected_tab == 'K-Guide AI':
             f"{selected_recommendation['expense']:,}원"
         )
 
-        if selected_recommendation['peak_season']:
-            st.write('성수기')
+        if selected_recommendation['peak_season'] >= 0.75:
+            st.write('매우 혼잡')
+        elif selected_recommendation['peak_season'] >= 0.5:
+            st.write('혼잡')
+        elif selected_recommendation['peak_season'] >= 0.25:
+            st.write('한적')
+        elif selected_recommendation['peak_season'] < 0.25:
+            st.write('매우 한적')
         else:
-            st.write('비수기')
+            st.write('성수기 정보 확인 불가')
 
         # ==========================================
         # 사용자 기본 조건 전달 테스트
