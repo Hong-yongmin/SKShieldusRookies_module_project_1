@@ -539,7 +539,111 @@ if selected_tab == '여행 추천':
     # 여행 추천 결과 출력
     # 여행지 후보 / 성수기/비수기 / 예상경비
     # ==========================================
-    if st.session_state.trip_started:
+
+
+    # ==========================================
+    # 항공 / 교통 정보 설정
+    # ==========================================
+
+    if (
+        st.session_state.trip_started
+        and st.session_state.transport_enabled is None
+    ):
+        st.subheader('이동 정보 설정')
+
+        st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
+
+        st.info('추천된 여행지 3곳을 기준으로 이동 정보를 조회합니다.')
+
+        # 입력값을 한 번에 처리하기 위한 form
+        with st.form('transport_form'):
+
+            departure = st.selectbox(
+                '출발 지역',
+                DEPARTURE_OPTIONS
+            )
+
+            transport_option_label = st.selectbox(
+                '교통편 추천 기준',
+                list(OPTION_OPTIONS.keys())
+            )
+
+            use_time_filter = st.checkbox(
+                '원하는 출발 시간 설정'
+            )
+
+            if use_time_filter:
+                time_after = st.time_input(
+                    '이 시간 이후 출발',
+                    value=None
+                )
+            else:
+                time_after = None
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                submit_transport = st.form_submit_button(
+                    '입력하고 추천받기',
+                    use_container_width=True
+                )
+
+            with col2:
+                skip_transport = st.form_submit_button(
+                    '건너뛰기',
+                    use_container_width=True
+                )
+
+        # 입력하고 추천받기
+        if submit_transport:
+
+            st.session_state.transport_enabled = True
+
+            st.session_state.departure = departure
+
+            st.session_state.transport_option = (
+                OPTION_OPTIONS[transport_option_label]
+            )
+
+            st.session_state.time_after = (
+                time_after.strftime('%H:%M')
+                if time_after is not None
+                else None
+            )
+
+            # 여행지별 API 요청 데이터 생성
+            st.session_state.transport_request = [
+                {
+                    'departure': departure,
+                    'arrival': destination,
+                    'option': OPTION_OPTIONS[transport_option_label],
+                    'time_after': (
+                        time_after.strftime('%H:%M')
+                        if time_after is not None
+                        else None
+                    )
+                }
+                for destination in st.session_state.destinations
+            ]
+
+            st.rerun()
+
+        # 건너뛰기
+        elif skip_transport:
+
+            st.session_state.transport_enabled = False
+
+            st.session_state.departure = None
+            st.session_state.transport_option = None
+            st.session_state.time_after = None
+            st.session_state.transport_request = None
+
+            st.rerun()
+
+    if (
+        st.session_state.trip_started
+        and st.session_state.transport_enabled is not None
+    ):
 
         st.header('추천 여행지')
 
@@ -577,10 +681,55 @@ if selected_tab == '여행 추천':
 
                 # 예상 경비
                 if expense is not None:
+
+                    # 1일 1인 예상 경비
+                    daily_expense = expense
+
+                    # 1인 기본 경비
+                    base_expense = daily_expense * period
+
+                    # 항공료
+                    flight_expense = 0
+
+                    if st.session_state.transport_enabled:
+
+                        destination_api = next(
+                            (
+                                data for data in st.session_state.api_context
+                                if data['destination'] == destination
+                            ),
+                            None
+                        )
+
+                        if destination_api:
+
+                            flights = destination_api.get('flights', [])
+
+                            if flights:
+
+                                flight_price = flights[0].get('price')
+
+                                if flight_price is not None:
+                                    # 1인 왕복
+                                    flight_expense = flight_price * 2
+
+                    total_expense = base_expense + flight_expense
+
+                    recommendation['daily_expense'] = daily_expense
+                    recommendation['base_expense'] = base_expense
+                    recommendation['flight_expense'] = flight_expense
+                    recommendation['total_expense'] = total_expense
+                    
+                    st.write(f'1인 1일 예상 경비 : {daily_expense:,}원')
+
+                    if st.session_state.transport_enabled and flight_expense > 0:
+                        st.write(f'왕복 항공료: {flight_expense:,}원')
+
                     st.metric(
-                        '예상 경비',
-                        f'{expense:,}원'
+                        '1인 총 예상 경비',
+                        f'{total_expense:,}원'
                     )
+
                 else:
                     st.info('예상 경비를 확인할 수 없습니다.')
 
@@ -620,10 +769,16 @@ elif selected_tab == 'K-Guide AI':
             f"{selected_recommendation['destination']}"
         )
 
-        st.write(
-            f"예상 경비: "
-            f"{selected_recommendation['expense']:,}원"
+        total_expense = selected_recommendation.get('total_expense')
+
+        if total_expense is not None:
+            st.write(
+            f"1인당 예상 총 경비: "
+            f"{total_expense:,}원"
         )
+        else:
+            st.info('예상 총 경비를 확인할 수 없습니다.')
+
 
         if selected_recommendation['peak_season'] >= 0.75:
             st.write('매우 혼잡')
@@ -848,109 +1003,6 @@ elif selected_tab == 'K-Guide AI':
             else:
                 st.info('관광지 정보를 불러오는 중입니다.')
 
-
-        # ==========================================
-        # 항공 / 교통 정보 설정
-        # ==========================================   
-        
-        if (
-            selected_recommendation is not None
-            and st.session_state.transport_enabled is None
-        ):
-            st.subheader('이동 정보 설정')
-
-            st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
-
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                departure = st.selectbox(
-                    '출발 지역',
-                    DEPARTURE_OPTIONS
-                )
-
-            with col2:
-
-                arrival = selected_recommendation['destination']
-
-                st.text_input(
-                    '도착 지역',
-                    value=arrival,
-                    disabled=True
-                )
-
-            transport_option_label = st.selectbox(
-                '교통편 추천 기준',
-                list(OPTION_OPTIONS.keys())
-            )
-
-            use_time_filter = st.checkbox(
-                '원하는 출발 시간 설정'
-            )
-
-            if use_time_filter:
-
-                time_after = st.time_input(
-                    '이 시간 이후 출발',
-                    value=None
-                )
-
-            else:
-
-                time_after = None
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                if st.button(
-                    '입력하고 추천받기',
-                    use_container_width=True
-                ):
-
-                    st.session_state.transport_enabled = True
-
-                    st.session_state.departure = departure
-
-                    st.session_state.transport_option = (
-                        OPTION_OPTIONS[transport_option_label]
-                    )
-
-                    st.session_state.time_after = (
-                        time_after.strftime('%H:%M')
-                        if time_after is not None
-                        else None
-                    )
-
-                    # API 요청 데이터
-                    st.session_state.transport_request = {
-                        'departure': departure,
-                        'arrival': selected_recommendation['destination'],
-                        'option': OPTION_OPTIONS[transport_option_label],
-                        'time_after': (
-                            time_after.strftime('%H:%M')
-                            if time_after is not None
-                            else None
-                        )
-                    }
-                    st.rerun()
-
-            with col2:
-
-                if st.button(
-                    '건너뛰기',
-                    use_container_width=True
-                ):
-
-                    st.session_state.transport_enabled = False
-                    st.session_state.departure = None
-                    st.session_state.transport_option = None
-                    st.session_state.time_after = None
-                    st.session_state.transport_request = None
-
-                    st.rerun()
 
         if st.session_state.transport_enabled:
             # 항공편, 교통편
