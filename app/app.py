@@ -334,7 +334,23 @@ def recommend_destination(gender, age, theme, num_of_people):
 	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
 	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
 	"""
-	return ['서울특별시',  '인천광역시', '부산광역시']
+	return [
+        {
+            'rank': 1,
+            'destination': '서울특별시',
+            'score': 91.7
+        },
+        {
+            'rank': 2,
+            'destination': '인천광역시',
+            'score': 82.9
+        },
+        {
+            'rank': 3,
+            'destination': '부산광역시',
+            'score': 77.1
+        }
+    ]
 
 # 예상 경비
 def estimate_expense(period, destination, num_of_people, theme):
@@ -349,8 +365,9 @@ def create_dummy_api_context(destinations):
 
     api_context = []
 
-    for destination in destinations:
+    for recommendation in destinations:
 
+        destination = recommendation['destination']
         # 여행지별 더미 데이터
         data = {
 
@@ -471,7 +488,9 @@ if selected_tab == '여행 추천':
 
                 recommendation_context=[]
 
-                for destination in st.session_state.destinations:
+                for recommendation in st.session_state.destinations:
+                    destination = recommendation['destination']
+
                     # 성수기 / 비수기
                     try:
                         peak = estimate_peak.is_peak_season(
@@ -480,15 +499,8 @@ if selected_tab == '여행 추천':
                             destination
                         )
 
-                        # st.write(
-                        #     f'[DEBUG] {destination} → peak={peak}, type={type(peak)}'
-                        # )
-
                     except Exception as e:
-                        # st.error(
-                        #     f'[DEBUG] {destination} 성수기 모델 호출 오류: {e}'
-                        # )
-                        peak = None # 모델 호출 결과가 None인 경우 UI 오류 방지를 위해 예외 처리
+                        peak = None
 
                     # 예상 경비
                     try:
@@ -502,7 +514,9 @@ if selected_tab == '여행 추천':
                         expense = None
 
                     recommendation_context.append({
+                        'rank': recommendation['rank'],
                         'destination': destination,
+                        'score': recommendation['score'],
                         'peak_season': peak,
                         'expense': expense
                     })
@@ -615,7 +629,7 @@ if selected_tab == '여행 추천':
             st.session_state.transport_request = [
                 {
                     'departure': departure,
-                    'arrival': destination,
+                    'arrival': recommendation['destination'],
                     'option': OPTION_OPTIONS[transport_option_label],
                     'time_after': (
                         time_after.strftime('%H:%M')
@@ -623,7 +637,7 @@ if selected_tab == '여행 추천':
                         else None
                     )
                 }
-                for destination in st.session_state.destinations
+                for recommendation in st.session_state.destinations
             ]
 
             st.rerun()
