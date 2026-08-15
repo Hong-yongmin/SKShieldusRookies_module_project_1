@@ -852,7 +852,7 @@ def recommend_destination(
     ]
 
 # 예상 경비
-def estimate_expense(period, destination, num_of_people, theme):
+def estimate_expense(period, destination, num_of_people, theme, age):
 	"""
 	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
 	1인당 1일 예상 경비를 예측해 반환합니다.
@@ -1058,7 +1058,8 @@ if selected_tab == '여행 추천':
                             period,
                             destination,
                             num_of_people,
-                            theme
+                            theme,
+                            age
                         )
                     except Exception:
                         expense = None
