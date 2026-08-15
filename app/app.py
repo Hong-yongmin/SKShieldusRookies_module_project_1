@@ -3,9 +3,13 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-from modules.functions import recommend_destination
+# from modules.functions import recommend_destination
+from model.Ruse import recommend_destination
 from model.estimate_expense import estimate_expense
 from model.estimate_peak import EstimatePeak
+
+from main import recommend_places
+from new import get_accommodations, get_weather
 
 
 # ==========================================
@@ -417,6 +421,22 @@ def create_dummy_api_context(destinations):
 
     return api_context
 
+# ==========================================
+# API 데이터
+# 날씨, 관광지, 숙소, 맛집 정보
+# ==========================================
+def create_api_context(destinations):
+    api_context = []
+
+    for destination in destinations:
+        restaurant_attraction = recommend_places(destination, theme)
+        data = {
+            'destination' : destination,
+            'accomadations' : get_accommodations(destination),
+            'weather' : get_weather(destination),
+            'restaraunts': restaurant_attraction['restaurants'],
+            'attractions' : restaurant_attraction['tourist_attractions']
+        }
 
 # ==========================================
 # 여행 추천 결과
@@ -436,8 +456,8 @@ if selected_tab == '여행 추천':
                 st.session_state.destinations = recommend_destination(
                     gender,
                     age,
-                    theme,
-                    num_of_people
+                    num_of_people,
+                    theme
                 )
 
                 # 추천 결과가 없는 경우
@@ -488,7 +508,7 @@ if selected_tab == '여행 추천':
                 # ------------------------------------------
                 st.write('여행 정보 준비 중...')
                 st.session_state.api_context = (
-                    create_dummy_api_context(
+                    create_api_context(
                         st.session_state.destinations
                     )
                 )
