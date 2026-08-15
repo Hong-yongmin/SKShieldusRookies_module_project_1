@@ -3,8 +3,10 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
-from modules.functions import recommend_destination, estimate_expense
+from modules.functions import recommend_destination
+from model.estimate_expense import estimate_expense
 from model.estimate_peak import EstimatePeak
+
 
 # ==========================================
 # 입력값 코드
@@ -464,7 +466,8 @@ if selected_tab == '여행 추천':
                             period,
                             destination,
                             num_of_people,
-                            theme
+                            theme,
+                            age
                         )
                     except Exception:
                         expense = None
