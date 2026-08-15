@@ -301,6 +301,35 @@ def _normalize_bus_city_name(city_name):
         city_name
     )
 
+# 여러 터미널이 존재하는 지역의 대표 고속버스터미널
+EXPRESS_TERMINAL_PREFERENCE = {
+    '서울': ['서울경부', '센트럴시티(서울)', '동서울'],
+    '부산': ['부산', '부산시외', '부산사상'],
+}
+
+# 여러 터미널이 존재하는 지역의 대표 시외버스터미널
+# 서울 → 부산 장거리 조회에서는 서울남부 → 부산서부(사상)을 우선 사용
+INTERCITY_TERMINAL_PREFERENCE = {
+    '서울': ['서울남부'],
+    '부산': ['부산서부(사상)', '부산서부(사상)/심야', '부산동부'],
+}
+
+
+def _find_preferred_terminal(terminals, preferred_names):
+    """검색된 터미널 중 대표 터미널을 우선 선택합니다."""
+
+    if not terminals:
+        return None
+
+    for preferred_name in preferred_names:
+        for terminal in terminals:
+            if terminal.get('terminalNm') == preferred_name:
+                return terminal.get('terminalId')
+
+    # 대표 터미널이 없으면 검색 결과의 첫 번째 터미널을 사용
+    return terminals[0].get('terminalId')
+
+
 def _find_first_express_terminal(city_name):
 
     city_name = _normalize_bus_city_name(
@@ -317,7 +346,16 @@ def _find_first_express_terminal(city_name):
     if not terminals:
         return None
 
-    return terminals[0].get('terminalId')
+    preferred_names = EXPRESS_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    return _find_preferred_terminal(
+        terminals,
+        preferred_names
+    )
+
 
 def _find_first_intercity_terminal(city_name):
 
@@ -335,7 +373,15 @@ def _find_first_intercity_terminal(city_name):
     if not terminals:
         return None
 
-    return terminals[0].get('terminalId')
+    preferred_names = INTERCITY_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    return _find_preferred_terminal(
+        terminals,
+        preferred_names
+    )
 
 def _find_airport_id(city_name, airport_data):
     airport_name = AIRPORT_NAME_MAP.get(city_name)
@@ -381,14 +427,8 @@ def get_transport_ids(departure, arrival):
             '출발지 또는 도착지가 없습니다.'
         )
 
-    if (
-        _normalize_city_for_compare(departure)
-        == _normalize_city_for_compare(arrival)
-    ):
-        raise ValueError(
-            f'{departure} → {arrival}은(는) 동일 지역입니다. '
-            '다른 출발지와 도착지를 선택해주세요.'
-        )
+    # 동일 지역 여부는 get_transport_results()에서 처리합니다.
+    # 여기서는 다른 지역의 교통수단 ID 매핑만 담당합니다.
 
     # ==========================================
     # 1. 기차 city code
@@ -508,6 +548,39 @@ def get_transport_results(
     option,
     time_after=None,
 ):
+
+    # 동일 지역은 해당 여행지만 교통편 조회를 건너뜁니다.
+    # 다른 추천 여행지의 교통편 조회에는 영향을 주지 않습니다.
+    if (
+        _normalize_city_for_compare(departure)
+        == _normalize_city_for_compare(arrival)
+    ):
+        print(
+            f'{departure} → {arrival} : 동일 지역이므로 '
+            '교통편 조회를 건너뜁니다.'
+        )
+
+        empty_ids = {
+            'train': {
+                'dep_place_id': None,
+                'arr_place_id': None
+            },
+            'express_bus': {
+                'dep_terminal_id': None,
+                'arr_terminal_id': None
+            },
+            'intercity_bus': {
+                'dep_terminal_id': None,
+                'arr_terminal_id': None
+            },
+            'flight': {
+                'depAirportId': None,
+                'arrAirportId': None
+            }
+        }
+
+        return empty_ids, []
+
     transport_ids = get_transport_ids(
         departure,
         arrival
@@ -1317,6 +1390,7 @@ if selected_tab == '여행 추천':
                     transport_results = {}
 
                     # 추천 여행지 3곳 각각 조회
+                    # 한 여행지에서 오류가 나더라도 나머지 여행지는 계속 조회합니다.
                     for recommendation in (
                         st.session_state.destinations
                     ):
@@ -1325,15 +1399,43 @@ if selected_tab == '여행 추천':
                             recommendation['destination']
                         )
 
-                        transport_ids, results = (
-                            get_transport_results(
-                                departure=departure,
-                                arrival=destination,
-                                trip_date=trip_date,
-                                option=option,
-                                time_after=time_after_str
+                        try:
+                            transport_ids, results = (
+                                get_transport_results(
+                                    departure=departure,
+                                    arrival=destination,
+                                    trip_date=trip_date,
+                                    option=option,
+                                    time_after=time_after_str
+                                )
                             )
-                        )
+
+                        except Exception as destination_error:
+                            print(
+                                f'{departure} → {destination} '
+                                f'교통편 조회 실패: {destination_error}'
+                            )
+
+                            transport_ids = {
+                                'train': {
+                                    'dep_place_id': None,
+                                    'arr_place_id': None
+                                },
+                                'express_bus': {
+                                    'dep_terminal_id': None,
+                                    'arr_terminal_id': None
+                                },
+                                'intercity_bus': {
+                                    'dep_terminal_id': None,
+                                    'arr_terminal_id': None
+                                },
+                                'flight': {
+                                    'depAirportId': None,
+                                    'arrAirportId': None
+                                }
+                            }
+
+                            results = []
 
                         transport_results[destination] = {
                             'transport_ids': transport_ids,
@@ -1794,9 +1896,22 @@ elif selected_tab == 'K-Guide AI':
 
             if not transport_results:
 
-                st.warning(
-                    '조건에 맞는 교통편이 없습니다.'
-                )
+                if (
+                    _normalize_city_for_compare(
+                        st.session_state.departure
+                    )
+                    == _normalize_city_for_compare(
+                        selected_destination
+                    )
+                ):
+                    st.info(
+                        '출발지와 여행지가 동일 지역이므로 '
+                        '교통편 조회를 생략했습니다.'
+                    )
+                else:
+                    st.warning(
+                        '조건에 맞는 교통편이 없습니다.'
+                    )
 
             else:
 
