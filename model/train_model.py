@@ -150,7 +150,7 @@ r2 = r2_score(y_test_real, y_pred_real, sample_weight=w_test)
 print(f"MAE: {mae:.1f}, R²: {r2:.4f}")
 
 # ══════════════════════════════════════
-# 9.5 (신규 추가) 전체 데이터로 최종 재학습
+# 9.5 (신규 추가) 전체 데이터로 최종 재학습 => 최종본으로 저장
 # ══════════════════════════════════════
 model_final.fit(X_data, y_log, sample_weight=w_data)  
 
