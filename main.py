@@ -322,7 +322,7 @@ def get_description_template(region, category, is_food=False):
 def recommend_places(region, theme, age="20대", group="1명", sex="남성"):
     normalized_region = normalize_region(region)
     if not normalized_region:
-        return json.dumps({"error": f"'{region}'은(는) 지원하지 않는 지역명입니다."}, ensure_ascii=False)
+        return {"error": f"'{region}'은(는) 지원하지 않는 지역명입니다."}
 
     all_types = ["12", "14", "15", "28", "32", "38", "39"]
     tour_data_list = []
@@ -372,14 +372,14 @@ def recommend_places(region, theme, age="20대", group="1명", sex="남성"):
         )
 
     if tour_df.empty and food_df.empty:
-        return json.dumps({"error": f"'{region}' 지역에 등록된 공공 API 데이터가 없습니다."}, ensure_ascii=False)
+        return {"error": f"'{region}' 지역에 등록된 공공 API 데이터가 없습니다."}
 
     # 🔹 첫 번째 코드와 동일하게 JSON 문자열 반환 (인터페이스 호환 유지)
-    return json.dumps({
+    return {
         "region": normalized_region,
         "tourist_attractions": tour_df[["name", "category", "address", "mapx", "mapy", "description", "opening_hours"]].to_dict(orient="records") if not tour_df.empty else [],
         "restaurants": food_df[["name", "category", "address", "mapx", "mapy", "description", "opening_hours", "food_type"]].to_dict(orient="records") if not food_df.empty else []
-    }, ensure_ascii=False)
+    }
 
 
 def web_search(query):
