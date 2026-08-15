@@ -70,7 +70,23 @@ def estimate_expense(period, destination, num_of_people, theme, age):
         age             : int   (1~6)
     출력:
         int (1인당 예상 총경비, 원화)
+    
+    예외:
+        ValueError - 필수 입력값이 비어있거나(None), 유효하지 않은 값일 때
     """
+    # ── 입력값 검증 ──
+    if period is None or not isinstance(period, (int, float)) or period <= 0:
+        raise ValueError(f"여행기간(period)이 유효하지 않습니다: {period}")
+    if destination is None or not isinstance(destination, str) or destination.strip() == '':
+        raise ValueError(f"여행지(destination)가 유효하지 않습니다: {destination}")
+    if num_of_people is None or num_of_people not in (1, 2, 3):
+        raise ValueError(f"인원수(num_of_people)는 1, 2, 3 중 하나여야 합니다: {num_of_people}")
+    if theme is None or not (1 <= theme <= 17):
+        raise ValueError(f"테마(theme)는 1~17 사이여야 합니다: {theme}")
+    if age is None or not (1 <= age <= 6):
+        raise ValueError(f"연령대(age)는 1~6 사이여야 합니다: {age}")
+
+    # ── 입력값 → 모델 피처 변환 ──
     input_dict = {col: 0 for col in X_columns}
     input_dict['M일HAP'] = period
     input_dict['RQ7_1'] = num_of_people
