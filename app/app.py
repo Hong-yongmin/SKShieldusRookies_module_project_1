@@ -21,7 +21,10 @@ from transport.api import (
     get_express_bus_terminal_list,
     get_intercity_bus_terminal_list,
     get_airport_codes,
+    get_domestic_airport_list
 )
+
+from transport.transport_service import get_transport_options
 
 # ==========================================
 # 입력값 코드
@@ -111,6 +114,47 @@ OPTION_OPTIONS = {
     "원하는 시간대": "time",
 }
 
+AIRPORT_NAME_MAP = {
+    '서울': '김포국제공항',
+    '서울특별시': '김포국제공항',
+
+    '부산': '김해국제공항',
+    '부산광역시': '김해국제공항',
+
+    '대구': '대구국제공항',
+    '대구광역시': '대구국제공항',
+
+    '인천': '인천국제공항',
+    '인천광역시': '인천국제공항',
+
+    '광주': '광주공항',
+    '광주광역시': '광주공항',
+
+    '울산': '울산공항',
+    '울산광역시': '울산공항',
+
+    '강원': '양양국제공항',
+    '강원도': '양양국제공항',
+
+    '충북': '청주국제공항',
+    '충청북도': '청주국제공항',
+
+    '전북': '군산공항',
+    '전라북도': '군산공항',
+
+    '전남': '무안국제공항',
+    '전라남도': '무안국제공항',
+
+    '경북': '포항경주공항',
+    '경상북도': '포항경주공항',
+
+    '경남': '김해국제공항',
+    '경상남도': '김해국제공항',
+
+    '제주': '제주국제공항',
+    '제주도': '제주국제공항',
+}
+
 
 # ==========================================
 # 함수
@@ -138,6 +182,7 @@ def format_duration(minutes):
         return f'{hours}시간'
     else:
         return f'{mins}분'
+
 
 def _extract_items(data):
     """
@@ -168,7 +213,6 @@ def _extract_items(data):
         return items
 
     return []
-
 
 def _find_city_code(
     city_name,
@@ -210,7 +254,6 @@ def _find_city_code(
 
     return None
 
-
 def _find_first_station(city_code):
     """
     city_code에 해당하는 대표 기차역 1개를 반환합니다.
@@ -224,14 +267,49 @@ def _find_first_station(city_code):
 
     return stations[0].get('nodeid')
 
+def _normalize_bus_city_name(city_name):
+    """
+    앱에서 사용하는 지역명을
+    고속/시외버스 터미널 API 검색용 지역명으로 변환합니다.
+    """
 
-def _find_first_express_terminal(city_code):
-    """
-    city_code에 해당하는 대표 고속버스터미널 1개를 반환합니다.
-    """
+    aliases = {
+        '서울특별시': '서울',
+        '부산광역시': '부산',
+        '대구광역시': '대구',
+        '인천광역시': '인천',
+        '광주광역시': '광주',
+        '대전광역시': '대전',
+        '울산광역시': '울산',
+        '세종특별자치시': '세종',
+        '세종특별시': '세종',
+
+        '경기도': '경기',
+        '강원도': '강원',
+        '충청북도': '충북',
+        '충청남도': '충남',
+        '전라북도': '전북',
+        '전라남도': '전남',
+        '경상북도': '경북',
+        '경상남도': '경남',
+        '제주특별자치도': '제주',
+        '제주도': '제주',
+    }
+
+    return aliases.get(
+        city_name,
+        city_name
+    )
+
+def _find_first_express_terminal(city_name):
+
+    city_name = _normalize_bus_city_name(
+        city_name
+    )
 
     data = get_express_bus_terminal_list(
-        city_code=city_code
+        terminal_nm=city_name,
+        num_of_rows=100
     )
 
     terminals = _extract_items(data)
@@ -241,14 +319,15 @@ def _find_first_express_terminal(city_code):
 
     return terminals[0].get('terminalId')
 
+def _find_first_intercity_terminal(city_name):
 
-def _find_first_intercity_terminal(city_code):
-    """
-    city_code에 해당하는 대표 시외버스터미널 1개를 반환합니다.
-    """
+    city_name = _normalize_bus_city_name(
+        city_name
+    )
 
     data = get_intercity_bus_terminal_list(
-        city_code=city_code
+        terminal_nm=city_name,
+        num_of_rows=100
     )
 
     terminals = _extract_items(data)
@@ -257,28 +336,33 @@ def _find_first_intercity_terminal(city_code):
         return None
 
     return terminals[0].get('terminalId')
+
+def _find_airport_id(city_name, airport_data):
+    airport_name = AIRPORT_NAME_MAP.get(city_name)
+
+    if not airport_name:
+        return None
+
+    for item in _extract_items(airport_data):
+        if item.get('airportNm') == airport_name:
+            return item.get('airportId')
+
+    return None
 
 # 교통수단 지역-ID 매핑
 def get_transport_ids(departure, arrival):
-    """
-    UI에서 받은 지역명(str)을
-    교통수단별 API ID로 변환합니다.
-    """
 
     if not departure or not arrival:
         raise ValueError(
             '출발지 또는 도착지가 없습니다.'
         )
-    
+
     # ==========================================
-    # 1. 지역명 → city_code
+    # 1. 기차 city code
     # ==========================================
 
     train_city_codes = get_train_city_codes()
-    express_city_codes = get_express_bus_city_codes()
-    intercity_city_codes = get_intercity_bus_city_codes()
 
-    # 기차 API에서 누락된 지역 코드 보정
     train_city_code_fallback = {
         '인천': '23',
     }
@@ -303,101 +387,63 @@ def get_transport_ids(departure, arrival):
         )
     )
 
-    
-    dep_express_city_code = _find_city_code(
-        departure,
-        express_city_codes,
-        name_key='cityName',
-        code_key='cityCode'
+    dep_train_id = (
+        _find_first_station(dep_train_city_code)
+        if dep_train_city_code
+        else None
     )
 
-    arr_express_city_code = _find_city_code(
-        arrival,
-        express_city_codes,
-        name_key='cityName',
-        code_key='cityCode'
+    arr_train_id = (
+        _find_first_station(arr_train_city_code)
+        if arr_train_city_code
+        else None
     )
-
-    dep_intercity_city_code = _find_city_code(
-        departure,
-        intercity_city_codes,
-        name_key='cityName',
-        code_key='cityCode'
-    )
-
-    arr_intercity_city_code = _find_city_code(
-        arrival,
-        intercity_city_codes,
-        name_key='cityName',
-        code_key='cityCode'
-    )
-
-    if dep_train_city_code is None:
-        dep_train_id = None
-    else:
-        dep_train_id = _find_first_station(
-            dep_train_city_code
-        )
-
-    if arr_train_city_code is None:
-        arr_train_id = None
-    else:
-        arr_train_id = _find_first_station(
-            arr_train_city_code
-        )
-
-    if dep_express_city_code is None:
-        raise ValueError(
-            f'{departure}의 고속버스 city_code를 찾을 수 없습니다.'
-        )
-
-    if arr_express_city_code is None:
-        raise ValueError(
-            f'{arrival}의 고속버스 city_code를 찾을 수 없습니다.'
-        )
-
-    if dep_intercity_city_code is None:
-        raise ValueError(
-            f'{departure}의 시외버스 city_code를 찾을 수 없습니다.'
-        )
-
-    if arr_intercity_city_code is None:
-        raise ValueError(
-            f'{arrival}의 시외버스 city_code를 찾을 수 없습니다.'
-        )
 
     # ==========================================
-    # 2. 지역별 기차역 ID
-    # ==========================================
-
-    # 위에서 이미 구했으므로 다시 호출하지 않음
-
-    # ==========================================
-    # 3. 지역별 고속버스터미널 ID
+    # 2. 고속버스
     # ==========================================
 
     dep_express_id = _find_first_express_terminal(
-        dep_express_city_code
+        departure
     )
 
     arr_express_id = _find_first_express_terminal(
-        arr_express_city_code
+        arrival
     )
 
     # ==========================================
-    # 4. 지역별 시외버스터미널 ID
+    # 3. 시외버스
     # ==========================================
 
     dep_intercity_id = _find_first_intercity_terminal(
-        dep_intercity_city_code
+        departure
     )
 
     arr_intercity_id = _find_first_intercity_terminal(
-        arr_intercity_city_code
+        arrival
     )
 
     # ==========================================
-    # 5. 결과 반환
+    # 4. 항공
+    # ==========================================
+
+    airport_data = get_domestic_airport_list(
+        pageNo=1,
+        numOfRows=100
+    )
+
+    dep_airport_id = _find_airport_id(
+        departure,
+        airport_data
+    )
+
+    arr_airport_id = _find_airport_id(
+        arrival,
+        airport_data
+    )
+
+    # ==========================================
+    # 5. 결과
     # ==========================================
 
     return {
@@ -414,8 +460,308 @@ def get_transport_ids(departure, arrival):
         'intercity_bus': {
             'dep_terminal_id': dep_intercity_id,
             'arr_terminal_id': arr_intercity_id
+        },
+
+        'flight': {
+            'depAirportId': dep_airport_id,
+            'arrAirportId': arr_airport_id
         }
     }
+
+def get_transport_results(
+    departure,
+    arrival,
+    trip_date,
+    option,
+    time_after=None,
+):
+    transport_ids = get_transport_ids(
+        departure,
+        arrival
+    )
+
+    transport_types = []
+    kwargs = {}
+
+    if (
+        transport_ids['train']['dep_place_id']
+        and transport_ids['train']['arr_place_id']
+    ):
+        transport_types.append('train')
+        kwargs['train'] = transport_ids['train']
+
+    if (
+        transport_ids['express_bus']['dep_terminal_id']
+        and transport_ids['express_bus']['arr_terminal_id']
+    ):
+        transport_types.append('express_bus')
+        kwargs['express_bus'] = transport_ids['express_bus']
+
+    if (
+        transport_ids['intercity_bus']['dep_terminal_id']
+        and transport_ids['intercity_bus']['arr_terminal_id']
+    ):
+        transport_types.append('intercity_bus')
+        kwargs['intercity_bus'] = transport_ids['intercity_bus']
+
+    if (
+        transport_ids['flight']['depAirportId']
+        and transport_ids['flight']['arrAirportId']
+    ):
+        transport_types.append('flight')
+        kwargs['flight'] = transport_ids['flight']
+
+    if not transport_types:
+        raise ValueError(
+            f'{departure} → {arrival} 구간에서 조회 가능한 교통수단이 없습니다.'
+        )
+    
+    results = get_transport_options(
+        transport_types=transport_types,
+        date=trip_date.strftime('%Y%m%d'),
+        **kwargs,
+    )
+
+    # ==========================================
+    # API 원본 결과 확인
+    # ==========================================
+
+    raw_result_count = len(results)
+
+    print('====================================')
+    print('교통 API 조회 테스트')
+    print(f'출발지: {departure}')
+    print(f'도착지: {arrival}')
+    print(f'날짜: {trip_date.strftime("%Y%m%d")}')
+    print(f'추천 기준: {option}')
+    print(f'시간 조건: {time_after}')
+    print(f'조회 교통수단: {transport_types}')
+    print(f'교통수단 ID: {transport_ids}')
+    print(f'API 원본 결과: {raw_result_count}건')
+
+    if results:
+        print('출발시간 목록:')
+        print([
+            item.get('departure_time')
+            for item in results
+        ])
+
+    # ==========================================
+    # 시간 필터
+    # ==========================================
+
+    if time_after:
+
+        results = [
+            item for item in results
+            if item.get('departure_time')
+            and item['departure_time'] >= time_after
+        ]
+
+        print(
+            f'시간 필터 적용 후: {len(results)}건'
+        )
+
+    print('====================================')
+
+    if option == 'fast':
+        results.sort(key=lambda x: x.get('duration') if x.get('duration') is not None else 999999)
+    elif option == 'cheap':
+        results.sort(key=lambda x: x.get('price') if x.get('price') is not None else 999999999)
+    elif option == 'comfort':
+        results.sort(key=lambda x: (
+            x.get('transfers', 999),
+            x.get('duration') if x.get('duration') is not None else 999999
+        ))
+    elif option == 'transfer':
+        results.sort(key=lambda x: x.get('transfers', 999))
+    elif option == 'time':
+        results.sort(key=lambda x: x.get('departure_time', '99:99'))
+
+    return transport_ids, results
+
+def _display_transport_item(item):
+    st.info(item.get('name', item.get('transport_type', '교통편')))
+
+    st.write(
+        f"교통수단: {item.get('transport_type', '-')}"
+    )
+
+    st.write(
+        f"{item.get('departure', '')} ➤ {item.get('arrival', '')}"
+    )
+
+    st.write(
+        f"출발: {item.get('departure_time', '-')}"
+    )
+
+    st.write(
+        f"도착: {item.get('arrival_time', '-')}"
+    )
+
+    if item.get('duration') is not None:
+        st.write(
+            f"소요 시간: {format_duration(item['duration'])}"
+        )
+
+    if item.get('price') is not None:
+        st.write(
+            f"가격: {item['price']:,}원"
+        )
+
+    if item.get('transfers') is not None:
+        st.write(
+            f"환승: {item['transfers']}회"
+        )
+
+# ==========================================
+# 부산 버스 터미널 API 상세 테스트
+# ==========================================
+
+if st.button('부산 버스 터미널 API 테스트'):
+
+    st.subheader(
+        '부산 버스 터미널 API 테스트'
+    )
+
+    # ==========================================
+    # 고속버스
+    # ==========================================
+
+    st.write('### ① 고속버스')
+
+    express_data = get_express_bus_terminal_list(
+        terminal_nm='부산',
+        num_of_rows=100
+    )
+
+    st.write('API 원본 응답')
+
+    st.json(express_data)
+
+    express_items = _extract_items(
+        express_data
+    )
+
+    st.write(
+        f'추출된 터미널 수: '
+        f'{len(express_items)}'
+    )
+
+    if express_items:
+
+        st.write('조회된 터미널')
+
+        st.dataframe(
+            express_items,
+            use_container_width=True
+        )
+
+    else:
+
+        st.error(
+            '부산 고속버스 터미널 검색 결과가 없습니다.'
+        )
+
+    # ==========================================
+    # 시외버스
+    # ==========================================
+
+    st.write('### ② 시외버스')
+
+    intercity_data = get_intercity_bus_terminal_list(
+        terminal_nm='부산',
+        num_of_rows=100
+    )
+
+    st.write('API 원본 응답')
+
+    st.json(intercity_data)
+
+    intercity_items = _extract_items(
+        intercity_data
+    )
+
+    st.write(
+        f'추출된 터미널 수: '
+        f'{len(intercity_items)}'
+    )
+
+    if intercity_items:
+
+        st.write('조회된 터미널')
+
+        st.dataframe(
+            intercity_items,
+            use_container_width=True
+        )
+
+    else:
+
+        st.error(
+            '부산 시외버스 터미널 검색 결과가 없습니다.'
+        )
+
+    # ==========================================
+    # 실제 보조 함수 반환값 테스트
+    # ==========================================
+
+    st.write('### ③ 실제 보조 함수 반환값')
+
+    # 고속버스
+    express_result = _find_first_express_terminal(
+        '부산'
+    )
+
+    st.write(
+        f'고속버스 _find_first_express_terminal("부산"): '
+        f'`{express_result}`'
+    )
+
+    # 시외버스
+    intercity_result = _find_first_intercity_terminal(
+        '부산'
+    )
+
+    st.write(
+        f'시외버스 _find_first_intercity_terminal("부산"): '
+        f'`{intercity_result}`'
+    )
+
+    # ==========================================
+    # 지역명별 보조 함수 반환값 비교
+    # ==========================================
+
+    st.write(
+        '### ④ 지역명별 터미널 ID 반환 비교'
+    )
+
+    test_cities = [
+        '부산',
+        '부산광역시'
+    ]
+
+    for city in test_cities:
+
+        st.write(
+            f'#### `{city}`'
+        )
+
+        express_id = _find_first_express_terminal(
+            city
+        )
+
+        intercity_id = _find_first_intercity_terminal(
+            city
+        )
+
+        st.write(
+            f'고속버스: `{express_id}`'
+        )
+
+        st.write(
+            f'시외버스: `{intercity_id}`'
+        )
 
 
 # ==========================================
@@ -507,6 +853,12 @@ if 'transport_requests' not in st.session_state:
     st.session_state.transport_requests = None
 
 
+if 'transport_results' not in st.session_state:
+    st.session_state.transport_results = {}
+
+if 'transport_ids' not in st.session_state:
+    st.session_state.transport_ids = None
+
 # ==========================================
 # 사용자 입력 영역
 # ==========================================
@@ -531,6 +883,8 @@ if st.sidebar.button('추천 내용 초기화'):
     st.session_state.transport_option = None
     st.session_state.time_after = None
     st.session_state.transport_requests = None
+    st.session_state.transport_results = {}
+    st.session_state.transport_ids = None
 
     st.toast('추천 내용이 초기화 되었습니다.')
 
@@ -910,33 +1264,77 @@ if selected_tab == '여행 추천':
             )
 
             # 여행지별 API 요청 데이터 생성
-            transport_requests = []
 
-            for recommendation in st.session_state.destinations:
-                destination = recommendation['destination']
+            option = OPTION_OPTIONS[
+                transport_option_label
+            ]
 
-                transport_ids = get_transport_ids(
-                    departure,
-                    destination
+            time_after_str = (
+                time_after.strftime('%H:%M')
+                if time_after is not None
+                else None
+            )
+
+            try:
+
+                with st.spinner(
+                    '교통편 정보를 조회하고 있습니다...'
+                ):
+
+                    transport_results = {}
+
+                    # 추천 여행지 3곳 각각 조회
+                    for recommendation in (
+                        st.session_state.destinations
+                    ):
+
+                        destination = (
+                            recommendation['destination']
+                        )
+
+                        transport_ids, results = (
+                            get_transport_results(
+                                departure=departure,
+                                arrival=destination,
+                                trip_date=trip_date,
+                                option=option,
+                                time_after=time_after_str
+                            )
+                        )
+
+                        transport_results[destination] = {
+                            'transport_ids': transport_ids,
+                            'results': results
+                        }
+
+                # 실제 조회 결과 저장
+
+                st.session_state.transport_results = (
+                    transport_results
                 )
 
-                transport_requests.append({
-                    'departure': departure,
-                    'arrival': destination,
-                    'option': OPTION_OPTIONS[
-                        transport_option_label
-                    ],
-                    'time_after': (
-                        time_after.strftime('%H:%M')
-                        if time_after is not None
-                        else None
-                    ),
-                    'transport_ids': transport_ids
-                })
+                # 기존 요청 정보 저장
+                st.session_state.transport_requests = [
+                    {
+                        'departure': departure,
+                        'arrival': destination,
+                        'option': option,
+                        'time_after': time_after_str,
+                        'transport_ids': (
+                            transport_results[destination]
+                            ['transport_ids']
+                        )
+                    }
+                    for destination in transport_results
+                ]
 
-            st.session_state.transport_requests = transport_requests
+                st.rerun()
 
-            st.rerun()
+            except Exception as e:
+
+                st.error(
+                    f'교통편 조회 중 오류가 발생했습니다: {e}'
+                )
 
         # ==========================================
         # 건너뛰기
@@ -996,28 +1394,33 @@ if selected_tab == '여행 추천':
 
                     # 항공료
                     flight_expense = 0
-
+                    
                     if st.session_state.transport_enabled:
 
-                        destination_api = next(
-                            (
-                                data for data in st.session_state.api_context
-                                if data['destination'] == destination
-                            ),
-                            None
+                        transport_data = (
+                            st.session_state.transport_results
+                            .get(destination, {})
                         )
 
-                        if destination_api:
+                        transport_results = (
+                            transport_data.get('results', [])
+                        )
 
-                            flights = destination_api.get('flights', [])
+                        flights = [
+                            item
+                            for item in transport_results
+                            if item.get('transport_type') == 'flight'
+                        ]
 
-                            if flights:
+                        if flights:
 
-                                flight_price = flights[0].get('price')
+                            flight_price = flights[0].get('price')
 
-                                if flight_price is not None:
-                                    # 1인 왕복
-                                    flight_expense = flight_price * 2
+                            if flight_price is not None:
+
+                                flight_expense = (
+                                    flight_price * 2
+                                )
 
                     total_expense = base_expense + flight_expense
 
@@ -1309,94 +1712,108 @@ elif selected_tab == 'K-Guide AI':
             else:
                 st.info('관광지 정보를 불러오는 중입니다.')
 
+        # 항공 / 교통
 
         if st.session_state.transport_enabled:
-            # 항공편, 교통편
+
             st.header('항공편, 교통편')
 
-            col1, col2 = st.columns(2)
+            # 현재 선택한 여행지의 교통 결과만 가져오기
+            transport_data = (
+                st.session_state.transport_results
+                .get(selected_destination, {})
+            )
 
-            # 항공편
-            with col1:
-                st.subheader('항공편')
+            transport_results = (
+                transport_data.get('results', [])
+            )
 
-                if selected_api_context:
+            if not transport_results:
 
-                    flights = selected_api_context.get(
-                        'flights',
-                        []
-                    )
+                st.warning(
+                    '조건에 맞는 교통편이 없습니다.'
+                )
+
+            else:
+
+                # 항공
+                flights = [
+                    item
+                    for item in transport_results
+                    if item.get('transport_type') == 'flight'
+                ]
+
+                # 기차 / 고속버스 / 시외버스
+                transportation = [
+                    item
+                    for item in transport_results
+                    if item.get('transport_type') != 'flight'
+                ]
+
+                col1, col2 = st.columns(2)
+
+                # 항공편
+
+                with col1:
+
+                    st.subheader('항공편')
 
                     if flights:
 
-                        flight = flights[0]
+                        for i, flight in enumerate(
+                            flights[:3],
+                            start=1
+                        ):
 
-                        # 항공사
-                        st.info(flight['name'])
+                            st.caption(
+                                f'항공편 {i}'
+                            )
 
-                        # 출발 / 도착
-                        st.write(f"{flight['departure']} ➤ {flight['arrival']}")
+                            _display_transport_item(
+                                flight
+                            )
 
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {flight['departure_time']}")
-                        st.write(f"도착: {flight['arrival_time']}")
-
-                        # 소요 시간
-                        if flight['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(flight['duration'])}")
-
-                        # 가격
-                        if flight['price'] is not None:
-                            st.write(f"가격: {flight['price']:,}원")
+                            if i < min(3, len(flights)):
+                                st.divider()
 
                     else:
-                        st.info('항공편 정보가 없습니다.')
 
-                else:
-                    st.info('항공편 정보를 불러오는 중입니다.')
+                        st.info(
+                            '조건에 맞는 항공편이 없습니다.'
+                        )
 
+                # 교통편
 
-            # 교통편
-            with col2:
-                st.subheader('교통편')
+                with col2:
 
-                if selected_api_context:
-
-                    transportation = selected_api_context.get(
-                        'transportation',
-                        []
-                    )
+                    st.subheader('교통편')
 
                     if transportation:
 
-                        transport = transportation[0]
-                        # 교통수단
-                        st.info(transport['name'])
+                        for i, transport in enumerate(
+                            transportation[:3],
+                            start=1
+                        ):
 
-                        # 교통수단 종류
-                        st.write(f"교통수단: {transport['transport_type']}")
-                        
-                        # 출발 / 도착
-                        st.write(f"{transport['departure']} ➤ {transport['arrival']}")
+                            st.caption(
+                                f'교통편 {i}'
+                            )
 
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {transport['departure_time']}")
-                        st.write(f"도착: {transport['arrival_time']}")
+                            _display_transport_item(
+                                transport
+                            )
 
-                        # 소요 시간
-                        if transport['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(transport['duration'])}")
-
-                        # 가격
-                        if transport['price'] is not None:
-                            st.write(f"가격: {transport['price']:,}원")
+                            if i < min(
+                                3,
+                                len(transportation)
+                            ):
+                                st.divider()
 
                     else:
-                        st.info('교통편 정보가 없습니다.')
 
-                else:
-                    st.info('교통편 정보를 불러오는 중입니다.')
-
+                        st.info(
+                            '조건에 맞는 교통편이 없습니다.'
+                        )
 
     # 대화 기록 출력
     for message in st.session_state.messages:
