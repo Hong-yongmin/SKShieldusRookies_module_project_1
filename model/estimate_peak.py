@@ -72,8 +72,8 @@ class EstimatePeak:
 
         if not area:
             return -1
-        
-        signgu_cd = self.signgu_code_info[(self.signgu_code_info['areaNm']==area)
+        # 주소가 '부산', '서울' 로 되어있는 경우라도 '부산광역시', '서울특별시'와 매칭되도록 contatins 사용
+        signgu_cd = self.signgu_code_info[(self.signgu_code_info['areaNm'].str.contains(area))
                                           &(self.signgu_code_info['sigunguNm'] == signgu)]['sigunguCd'].values
         if len(signgu_cd) == 0:
             return -1
@@ -201,7 +201,7 @@ class EstimatePeak:
 
 if __name__=='__main__':
     trip_date = '20260819'
-    destination = '서울특별시 중구 사직로 161'
+    destination = '서울 중구 사직로 161'
     load_dotenv()
     estimate_peak = EstimatePeak()
 
