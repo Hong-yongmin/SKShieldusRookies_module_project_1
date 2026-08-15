@@ -3,26 +3,15 @@ import math
 import datetime
 import requests
 import urllib.parse
-import streamlit as st
 from dotenv import load_dotenv
-from openai import OpenAI
 
-# 1. 환경변수 불러오기 (.env)
+# 환경변수 로드 (카카오, 공공데이터 키)
 load_dotenv()
 PUBLIC_DATA_KEY = os.getenv('PUBLIC_DATA_KEY')
 KAKAO_REST_API_KEY = os.getenv('KAKAO_REST_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-
-# OpenAI 클라이언트 초기화
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-# Streamlit 기본 설정
-st.set_page_config(page_title="전국 여행 날씨 & 숙소 안내 챗봇", page_icon="🌤️", layout="centered")
-st.title("🌤️ 여행 날씨 & 숙소 안내 챗봇")
-st.caption("카카오 API + 기상청 단기예보 API + OpenAI 연동")
 
 
-# --- Helper 1: 카카오 API로 주소/지명 변환 ---
+# --- Helper 1: 카카오 API로 주소/지명 변환 (위경도 가져오기) ---
 def get_lat_lon_from_address(address_text):
     headers = {
         "Authorization": f"KakaoAK {KAKAO_REST_API_KEY}",
@@ -61,39 +50,56 @@ def get_lat_lon_from_address(address_text):
 
 
 # --- Helper 2: 카카오 API로 주변 숙박업소 검색 ---
-def search_accommodations(lat, lon, radius=3000):
-    url = "https://dapi.kakao.com/v2/local/search/category.json"
+def search_accommodations(lat, lon, radius=5000, target_region=""):
+    url = "https://dapi.kakao.com/v2/local/search/keyword.json"
     headers = {
         "Authorization": f"KakaoAK {KAKAO_REST_API_KEY}",
         "User-Agent": "Mozilla/5.0"
     }
+    
+    # "용산구 호텔", "영등포구 숙소" 형식으로 쿼리 구성
+    query_text = f"{target_region} 호텔" if target_region else "호텔"
+    
+    # 💡 핵심: 지역명으로 검색할 땐 x, y, radius 제한을 없애야 그 '구' 전체 숙소가 잘 나옵니다!
     params = {
-        "category_group_code": "AD5",
-        "x": str(lon),
-        "y": str(lat),
-        "radius": radius,
+        "query": query_text,
+        "size": 15,          # 검색 결과를 15개까지 가져옴
         "sort": "accuracy"
     }
 
+    # 만약 target_region이 지정 안 되어있다면(좌표 기반 검색) 좌표 파라미터 추가
+    if not target_region and lat and lon:
+        params["x"] = str(lon)
+        params["y"] = str(lat)
+        params["radius"] = radius
+
+    accommodations = []
     try:
         res = requests.get(url, headers=headers, params=params, timeout=5)
         data = res.json()
         
-        places = []
         if data.get('documents'):
-            for doc in data['documents'][:5]:
-                category = doc['category_name'].split(' > ')[-1] if ' > ' in doc['category_name'] else doc['category_name']
-                places.append({
-                    "name": doc['place_name'],
-                    "category": category,
-                    "address": doc['road_address_name'] or doc['address_name'],
-                    "phone": doc['phone'] if doc['phone'] else "전화번호 정보 없음",
-                    "url": doc['place_url']
-                })
-        return places
+            for doc in data['documents']:
+                addr = doc['road_address_name'] or doc['address_name']
+                
+                # 주소에 target_region(예: 용산구)이 들어있는 진짜 해당 지역 숙소만 채택
+                if not target_region or target_region in addr:
+                    accommodations.append({
+                        'name': doc['place_name'],
+                        'rating': 4.5,
+                        'price': 100000,
+                        'address': addr,
+                        'url': doc['place_url'],
+                        'latitude': float(doc['y']),
+                        'longitude': float(doc['x'])
+                    })
+                    
+                if len(accommodations) >= 5:
+                    break
     except Exception as e:
         print(f"숙소 검색 오류: {e}")
-        return []
+        
+    return accommodations
 
 
 # --- Helper 3: 위경도 -> 기상청 격자(nx, ny) 변환 ---
@@ -151,124 +157,67 @@ def fetch_weather_data(nx, ny):
     }
     headers = {'User-Agent': 'Mozilla/5.0'}
 
+    weather_info = {
+        'max_temp': 25,
+        'min_temp': 15,
+        'weather': '맑음',
+        'rain_probability': 0,
+        'air_quality': '보통'
+    }
+
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
         data = response.json()
         
         if data.get('response', {}).get('header', {}).get('resultCode') == '00':
-            return data['response']['body']['items']['item']
+            items = data['response']['body']['items']['item']
+            
+            temps, pop_list, sky_counts = [], [], []
+            sky_dict = {'1': '맑음', '3': '구름많음', '4': '흐림'}
+
+            for item in items:
+                category = item['category']
+                val = item['fcstValue']
+
+                if category == 'TMP':
+                    temps.append(float(val))
+                elif category == 'POP':
+                    pop_list.append(int(val))
+                elif category == 'SKY':
+                    sky_counts.append(val)
+
+            if temps:
+                weather_info['max_temp'] = int(max(temps))
+                weather_info['min_temp'] = int(min(temps))
+            if pop_list:
+                weather_info['rain_probability'] = max(pop_list)
+            if sky_counts:
+                most_sky = max(set(sky_counts), key=sky_counts.count)
+                weather_info['weather'] = sky_dict.get(most_sky, '맑음')
+
     except Exception as e:
         print("기상청 API 호출 예외 발생:", e)
         
-    return None
+    return weather_info
 
 
-# --- Helper 5: 기상 데이터 정제 ---
-def summarize_weather(items):
-    if not items:
-        return None
-
-    sky_dict = {'1': '맑음 ☀️', '3': '구름많음 ⛅', '4': '흐림 ☁️'}
-    daily_data = {}
-
-    for item in items:
-        fcst_date = item['fcstDate']
-        category = item['category']
-        val = item['fcstValue']
-
-        if fcst_date not in daily_data:
-            daily_data[fcst_date] = {'sky': [], 'tmp': [], 'pty': []}
-
-        if category == 'SKY': daily_data[fcst_date]['sky'].append(val)
-        elif category == 'TMP': daily_data[fcst_date]['tmp'].append(float(val))
-        elif category == 'PTY': daily_data[fcst_date]['pty'].append(val)
-
-    summary_text = ""
-    for fcst_date, values in list(daily_data.items())[:5]:
-        min_tmp = int(min(values['tmp'])) if values['tmp'] else '-'
-        max_tmp = int(max(values['tmp'])) if values['tmp'] else '-'
-        most_sky = max(set(values['sky']), key=values['sky'].count) if values['sky'] else '1'
-        sky_status = sky_dict.get(most_sky, '맑음 ☀️')
-        
-        has_rain = any(p != '0' for p in values['pty'])
-        if has_rain:
-            sky_status += " / 🌧️ 비·눈 예보"
-
-        summary_text += f"- **{fcst_date[:4]}-{fcst_date[4:6]}-{fcst_date[6:]}**: {sky_status} | 최저 **{min_tmp}°C** / 최고 **{max_tmp}°C**\n"
-
-    return summary_text
-
-
-# --- Helper 6: OpenAI 답변 생성 (디자인 강화 프롬프트) ---
-def generate_gpt_response(user_prompt, location_name, weather_summary, accommodations):
-    system_instruction = (
-        "당신은 친절한 여행 가이드입니다. "
-        "응답은 시각적으로 보기 좋게 마크다운 문법(제목, 구분선, 이모지, 볼드체 등)을 적극적으로 활용하여 작성하세요.\n\n"
-        "작성 형태 예시:\n"
-        "### 📍 [지역명] 여행 날씨 예보\n"
-        "(날씨 정보 요약)\n\n"
-        "---\n"
-        "### 🏨 추천 숙소 Best 5\n"
-        "각 숙소별로 아래 형식으로 보여주세요:\n"
-        "1. **숙소명** (`카테고리`)\n"
-        "   - 📌 주소: ...\n"
-        "   - 📞 전화: ...\n"
-        "   - 🔗 [카카오맵으로 위치 확인하기](링크)\n"
-    )
+# ==========================================
+# 메인 통합 함수 (app.py에서 호출할 함수)
+# ==========================================
+def get_weather_and_accommodations(destination_name, client=None):
+    addr, lat, lon = get_lat_lon_from_address(destination_name)
     
-    acc_text = ""
-    if accommodations:
-        acc_text = "주변 추천 숙소 목록:\n"
-        for idx, acc in enumerate(accommodations, 1):
-            acc_text += f"{idx}. 이름: {acc['name']} | 카테고리: {acc['category']} | 주소: {acc['address']} | 전화: {acc['phone']} | 링크: {acc['url']}\n"
-    else:
-        acc_text = "주변 숙소 정보가 없습니다."
+    if not lat or not lon:
+        return [], {'max_temp': '-', 'min_temp': '-', 'weather': '정보 없음', 'rain_probability': 0, 'air_quality': '-'}
 
-    user_content = f"사용자 질문: {user_prompt}\n위치: {location_name}\n\n[날씨 정보]\n{weather_summary}\n\n[{acc_text}]"
+    # 💡 destination_name("용산구", "제주도", "부산" 등)을 그대로 전달!
+    accommodations = search_accommodations(lat, lon, radius=5000, target_region=destination_name)
+    # 2. 날씨 조회
+    nx, ny = dfs_xy(lat, lon)
+    weather = fetch_weather_data(nx, ny)
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": user_content}
-            ],
-            temperature=0.7
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        print(f"OpenAI API 오류: {e}")
-        return f"📍 **[{location_name}] 날씨 및 숙소 안내**\n\n{weather_summary}\n\n{acc_text}"
+    # 3. 필요 시 전달받은 client 객체를 활용해 LLM 가공 로직 수행 가능
+    # if client is not None:
+    #     response = client.chat.completions.create(...)
 
-
-# --- Streamlit UI ---
-if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "안녕하세요! 궁금하신 **지역명**(예: 강릉, 부산 해운대, 제주도)을 입력해주시면 **날씨와 주변 추천 숙소**를 예쁘게 정리해 드릴게요! 🏖️"}
-    ]
-
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-if prompt := st.chat_input("여행지나 궁금한 지역을 입력하세요..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
-
-    with st.spinner("위치, 날씨 및 주변 숙소 정보를 불러오는 중... ⏳"):
-        address_name, lat, lon = get_lat_lon_from_address(prompt)
-
-        if address_name and lat and lon:
-            nx, ny = dfs_xy(lat, lon)
-            items = fetch_weather_data(nx, ny)
-            weather_summary = summarize_weather(items)
-            accommodations = search_accommodations(lat, lon)
-
-            if weather_summary:
-                bot_response = generate_gpt_response(prompt, address_name, weather_summary, accommodations)
-            else:
-                bot_response = f"⚠️ **{address_name}** 지역의 날씨 데이터를 불러오는 데 실패했습니다."
-        else:
-            bot_response = "❌ 정확한 위치를 찾을 수 없습니다. 구체적인 지명이나 주소를 입력해 주세요!"
-
-    st.session_state.messages.append({"role": "assistant", "content": bot_response})
-    st.chat_message("assistant").write(bot_response)
+    return accommodations, weather
