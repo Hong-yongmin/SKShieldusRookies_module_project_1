@@ -1,6 +1,6 @@
 # 여러 추천 장소를 순서대로 연결해서 장소간 이동 정보 생성
 
-from place_transport import get_place_transport
+from transport.place_transport import get_place_transport
 
 
 def search_place_transport(

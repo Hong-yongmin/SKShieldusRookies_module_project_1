@@ -2,9 +2,40 @@ import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import sys
 
-from modules.functions import recommend_destination, estimate_expense
+# 현재 파일 기준 상위(최상위) 폴더 경로를 sys.path에 추가
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# from pathlib import Path
+# # 프로젝트 루트 경로 추가
+# PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# if str(PROJECT_ROOT) not in sys.path:
+#     sys.path.insert(0, str(PROJECT_ROOT))
+
+# from modules.functions import recommend_destination
+from model.Ruse import recommend_destination
+from model.estimate_expense import estimate_expense
 from model.estimate_peak import EstimatePeak
+
+from main import recommend_places
+from new import get_accommodations, get_weather
+
+from model.estimate_peak import EstimatePeak
+
+from transport.api import (
+    get_train_city_codes,
+    get_express_bus_city_codes,
+    get_intercity_bus_city_codes,
+    get_train_stations,
+    get_express_bus_terminal_list,
+    get_intercity_bus_terminal_list,
+    get_airport_codes,
+    get_domestic_airport_list
+)
+
+from transport.transport_service import get_transport_options
 
 # ==========================================
 # 입력값 코드
@@ -94,6 +125,47 @@ OPTION_OPTIONS = {
     "원하는 시간대": "time",
 }
 
+AIRPORT_NAME_MAP = {
+    '서울': '김포국제공항',
+    '서울특별시': '김포국제공항',
+
+    '부산': '김해국제공항',
+    '부산광역시': '김해국제공항',
+
+    '대구': '대구국제공항',
+    '대구광역시': '대구국제공항',
+
+    '인천': '인천국제공항',
+    '인천광역시': '인천국제공항',
+
+    '광주': '광주공항',
+    '광주광역시': '광주공항',
+
+    '울산': '울산공항',
+    '울산광역시': '울산공항',
+
+    '강원': '양양국제공항',
+    '강원도': '양양국제공항',
+
+    '충북': '청주국제공항',
+    '충청북도': '청주국제공항',
+
+    '전북': '군산공항',
+    '전라북도': '군산공항',
+
+    '전남': '무안국제공항',
+    '전라남도': '무안국제공항',
+
+    '경북': '포항경주공항',
+    '경상북도': '포항경주공항',
+
+    '경남': '김해국제공항',
+    '경상남도': '김해국제공항',
+
+    '제주': '제주국제공항',
+    '제주도': '제주국제공항',
+}
+
 
 # ==========================================
 # 함수
@@ -121,6 +193,692 @@ def format_duration(minutes):
         return f'{hours}시간'
     else:
         return f'{mins}분'
+
+
+def _extract_items(data):
+    """
+    공공데이터 API 응답에서 item 목록만 추출합니다.
+    """
+    if not isinstance(data, dict):
+        return []
+
+    response = data.get('response', data)
+
+    if not isinstance(response, dict):
+        return []
+
+    body = response.get('body', {})
+
+    if not isinstance(body, dict):
+        return []
+
+    items = body.get('items', {})
+
+    if isinstance(items, dict):
+        items = items.get('item', [])
+
+    if isinstance(items, dict):
+        return [items]
+
+    if isinstance(items, list):
+        return items
+
+    return []
+
+def _find_city_code(
+    city_name,
+    city_code_data,
+    name_key='cityname',
+    code_key='citycode'
+):
+    """
+    지역명 → 공공데이터 API city_code
+    """
+
+    items = _extract_items(city_code_data)
+
+    aliases = {
+        '서울': '서울특별시',
+        '부산': '부산광역시',
+        '대구': '대구광역시',
+        '인천': '인천광역시',
+        '광주': '광주광역시',
+        '대전': '대전광역시',
+        '울산': '울산광역시',
+        '세종': '세종특별시',
+        '경기': '경기도',
+        '강원': '강원도',
+        '충북': '충청북도',
+        '충남': '충청남도',
+        '전북': '전라북도',
+        '전남': '전라남도',
+        '경북': '경상북도',
+        '경남': '경상남도',
+        '제주': '제주도',
+    }
+
+    target_name = aliases.get(city_name, city_name)
+
+    for item in items:
+        if item.get(name_key) == target_name:
+            return item.get(code_key)
+
+    return None
+
+def _find_first_station(city_code):
+    """
+    city_code에 해당하는 대표 기차역 1개를 반환합니다.
+    """
+
+    data = get_train_stations(city_code)
+    stations = _extract_items(data)
+
+    if not stations:
+        return None
+
+    return stations[0].get('nodeid')
+
+def _normalize_bus_city_name(city_name):
+    """
+    앱에서 사용하는 지역명을
+    고속/시외버스 터미널 API 검색용 지역명으로 변환합니다.
+    """
+
+    aliases = {
+        '서울특별시': '서울',
+        '부산광역시': '부산',
+        '대구광역시': '대구',
+        '인천광역시': '인천',
+        '광주광역시': '광주',
+        '대전광역시': '대전',
+        '울산광역시': '울산',
+        '세종특별자치시': '세종',
+        '세종특별시': '세종',
+
+        '경기도': '경기',
+        '강원도': '강원',
+        '충청북도': '충북',
+        '충청남도': '충남',
+        '전라북도': '전북',
+        '전라남도': '전남',
+        '경상북도': '경북',
+        '경상남도': '경남',
+        '제주특별자치도': '제주',
+        '제주도': '제주',
+    }
+
+    return aliases.get(
+        city_name,
+        city_name
+    )
+
+# 여러 터미널이 존재하는 지역의 대표 고속버스터미널
+EXPRESS_TERMINAL_PREFERENCE = {
+    '서울': ['서울경부', '센트럴시티(서울)', '동서울'],
+    '부산': ['부산', '부산시외', '부산사상'],
+}
+
+# 여러 터미널이 존재하는 지역의 대표 시외버스터미널
+# 서울 → 부산 장거리 조회에서는 서울남부 → 부산서부(사상)을 우선 사용
+INTERCITY_TERMINAL_PREFERENCE = {
+    '서울': ['서울남부'],
+    '부산': ['부산서부(사상)', '부산서부(사상)/심야', '부산동부'],
+}
+
+
+def _find_preferred_terminal(terminals, preferred_names):
+    """검색된 터미널 중 대표 터미널을 우선 선택합니다."""
+
+    if not terminals:
+        return None
+
+    for preferred_name in preferred_names:
+        for terminal in terminals:
+            if terminal.get('terminalNm') == preferred_name:
+                return terminal.get('terminalId')
+
+    # 대표 터미널이 없으면 검색 결과의 첫 번째 터미널을 사용
+    return terminals[0].get('terminalId')
+
+
+def _find_first_express_terminal(city_name):
+
+    city_name = _normalize_bus_city_name(
+        city_name
+    )
+
+    data = get_express_bus_terminal_list(
+        terminal_nm=city_name,
+        num_of_rows=100
+    )
+
+    terminals = _extract_items(data)
+
+    if not terminals:
+        return None
+
+    preferred_names = EXPRESS_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    return _find_preferred_terminal(
+        terminals,
+        preferred_names
+    )
+
+
+def _find_first_intercity_terminal(city_name):
+
+    city_name = _normalize_bus_city_name(
+        city_name
+    )
+
+    data = get_intercity_bus_terminal_list(
+        terminal_nm=city_name,
+        num_of_rows=100
+    )
+
+    terminals = _extract_items(data)
+
+    if not terminals:
+        return None
+
+    preferred_names = INTERCITY_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    return _find_preferred_terminal(
+        terminals,
+        preferred_names
+    )
+
+def _find_airport_id(city_name, airport_data):
+    airport_name = AIRPORT_NAME_MAP.get(city_name)
+
+    if not airport_name:
+        return None
+
+    for item in _extract_items(airport_data):
+        if item.get('airportNm') == airport_name:
+            return item.get('airportId')
+
+    return None
+
+# 교통수단 지역-ID 매핑
+def _normalize_city_for_compare(city_name):
+    aliases = {
+        '서울': '서울특별시',
+        '부산': '부산광역시',
+        '대구': '대구광역시',
+        '인천': '인천광역시',
+        '광주': '광주광역시',
+        '대전': '대전광역시',
+        '울산': '울산광역시',
+        '세종': '세종특별시',
+        '경기': '경기도',
+        '강원': '강원도',
+        '충북': '충청북도',
+        '충남': '충청남도',
+        '전북': '전라북도',
+        '전남': '전라남도',
+        '경북': '경상북도',
+        '경남': '경상남도',
+        '제주': '제주도',
+    }
+
+    return aliases.get(city_name, city_name)
+
+
+def get_transport_ids(departure, arrival):
+
+    if not departure or not arrival:
+        raise ValueError(
+            '출발지 또는 도착지가 없습니다.'
+        )
+
+    # 동일 지역 여부는 get_transport_results()에서 처리합니다.
+    # 여기서는 다른 지역의 교통수단 ID 매핑만 담당합니다.
+
+    # ==========================================
+    # 1. 기차 city code
+    # ==========================================
+
+    train_city_codes = get_train_city_codes()
+
+    train_city_code_fallback = {
+        '인천': '23',
+    }
+
+    dep_train_city_code = train_city_code_fallback.get(
+        departure,
+        _find_city_code(
+            departure,
+            train_city_codes,
+            name_key='cityname',
+            code_key='citycode'
+        )
+    )
+
+    arr_train_city_code = train_city_code_fallback.get(
+        arrival,
+        _find_city_code(
+            arrival,
+            train_city_codes,
+            name_key='cityname',
+            code_key='citycode'
+        )
+    )
+
+    dep_train_id = (
+        _find_first_station(dep_train_city_code)
+        if dep_train_city_code
+        else None
+    )
+
+    arr_train_id = (
+        _find_first_station(arr_train_city_code)
+        if arr_train_city_code
+        else None
+    )
+
+    # ==========================================
+    # 2. 고속버스
+    # ==========================================
+
+    dep_express_id = _find_first_express_terminal(
+        departure
+    )
+
+    arr_express_id = _find_first_express_terminal(
+        arrival
+    )
+
+    # ==========================================
+    # 3. 시외버스
+    # ==========================================
+
+    dep_intercity_id = _find_first_intercity_terminal(
+        departure
+    )
+
+    arr_intercity_id = _find_first_intercity_terminal(
+        arrival
+    )
+
+    # ==========================================
+    # 4. 항공
+    # ==========================================
+
+    airport_data = get_domestic_airport_list(
+        pageNo=1,
+        numOfRows=100
+    )
+
+    dep_airport_id = _find_airport_id(
+        departure,
+        airport_data
+    )
+
+    arr_airport_id = _find_airport_id(
+        arrival,
+        airport_data
+    )
+
+    # ==========================================
+    # 5. 결과
+    # ==========================================
+
+    return {
+        'train': {
+            'dep_place_id': dep_train_id,
+            'arr_place_id': arr_train_id
+        },
+
+        'express_bus': {
+            'dep_terminal_id': dep_express_id,
+            'arr_terminal_id': arr_express_id
+        },
+
+        'intercity_bus': {
+            'dep_terminal_id': dep_intercity_id,
+            'arr_terminal_id': arr_intercity_id
+        },
+
+        'flight': {
+            'depAirportId': dep_airport_id,
+            'arrAirportId': arr_airport_id
+        }
+    }
+
+def get_transport_results(
+    departure,
+    arrival,
+    trip_date,
+    option,
+    time_after=None,
+):
+
+    # 동일 지역은 해당 여행지만 교통편 조회를 건너뜁니다.
+    # 다른 추천 여행지의 교통편 조회에는 영향을 주지 않습니다.
+    if (
+        _normalize_city_for_compare(departure)
+        == _normalize_city_for_compare(arrival)
+    ):
+        print(
+            f'{departure} → {arrival} : 동일 지역이므로 '
+            '교통편 조회를 건너뜁니다.'
+        )
+
+        empty_ids = {
+            'train': {
+                'dep_place_id': None,
+                'arr_place_id': None
+            },
+            'express_bus': {
+                'dep_terminal_id': None,
+                'arr_terminal_id': None
+            },
+            'intercity_bus': {
+                'dep_terminal_id': None,
+                'arr_terminal_id': None
+            },
+            'flight': {
+                'depAirportId': None,
+                'arrAirportId': None
+            }
+        }
+
+        return empty_ids, []
+
+    transport_ids = get_transport_ids(
+        departure,
+        arrival
+    )
+
+    transport_types = []
+    kwargs = {}
+
+    if (
+        transport_ids['train']['dep_place_id']
+        and transport_ids['train']['arr_place_id']
+    ):
+        transport_types.append('train')
+        kwargs['train'] = transport_ids['train']
+
+    if (
+        transport_ids['express_bus']['dep_terminal_id']
+        and transport_ids['express_bus']['arr_terminal_id']
+    ):
+        transport_types.append('express_bus')
+        kwargs['express_bus'] = transport_ids['express_bus']
+
+    if (
+        transport_ids['intercity_bus']['dep_terminal_id']
+        and transport_ids['intercity_bus']['arr_terminal_id']
+    ):
+        transport_types.append('intercity_bus')
+        kwargs['intercity_bus'] = transport_ids['intercity_bus']
+
+    if (
+        transport_ids['flight']['depAirportId']
+        and transport_ids['flight']['arrAirportId']
+    ):
+        transport_types.append('flight')
+        kwargs['flight'] = transport_ids['flight']
+
+    if not transport_types:
+        raise ValueError(
+            f'{departure} → {arrival} 구간에서 조회 가능한 교통수단이 없습니다.'
+        )
+    
+    results = get_transport_options(
+        transport_types=transport_types,
+        date=trip_date.strftime('%Y%m%d'),
+        **kwargs,
+    )
+
+    # ==========================================
+    # API 원본 결과 확인
+    # ==========================================
+
+    raw_result_count = len(results)
+
+    print('====================================')
+    print('교통 API 조회 테스트')
+    print(f'출발지: {departure}')
+    print(f'도착지: {arrival}')
+    print(f'날짜: {trip_date.strftime("%Y%m%d")}')
+    print(f'추천 기준: {option}')
+    print(f'시간 조건: {time_after}')
+    print(f'조회 교통수단: {transport_types}')
+    print(f'교통수단 ID: {transport_ids}')
+    print(f'API 원본 결과: {raw_result_count}건')
+
+    if results:
+        print('출발시간 목록:')
+        print([
+            item.get('departure_time')
+            for item in results
+        ])
+
+    # ==========================================
+    # 시간 필터
+    # ==========================================
+
+    if time_after:
+
+        results = [
+            item for item in results
+            if item.get('departure_time')
+            and item['departure_time'] >= time_after
+        ]
+
+        print(
+            f'시간 필터 적용 후: {len(results)}건'
+        )
+
+    print('====================================')
+
+    if option == 'fast':
+        results.sort(key=lambda x: x.get('duration') if x.get('duration') is not None else 999999)
+    elif option == 'cheap':
+        results.sort(key=lambda x: x.get('price') if x.get('price') is not None else 999999999)
+    elif option == 'comfort':
+        results.sort(key=lambda x: (
+            x.get('transfers', 999),
+            x.get('duration') if x.get('duration') is not None else 999999
+        ))
+    elif option == 'transfer':
+        results.sort(key=lambda x: x.get('transfers', 999))
+    elif option == 'time':
+        results.sort(key=lambda x: x.get('departure_time', '99:99'))
+
+    return transport_ids, results
+
+def _display_transport_item(item):
+    st.info(item.get('name', item.get('transport_type', '교통편')))
+
+    st.write(
+        f"교통수단: {item.get('transport_type', '-')}"
+    )
+
+    st.write(
+        f"{item.get('departure', '')} ➤ {item.get('arrival', '')}"
+    )
+
+    st.write(
+        f"출발: {item.get('departure_time', '-')}"
+    )
+
+    st.write(
+        f"도착: {item.get('arrival_time', '-')}"
+    )
+
+    if item.get('duration') is not None:
+        st.write(
+            f"소요 시간: {format_duration(item['duration'])}"
+        )
+
+    if item.get('price') is not None:
+        st.write(
+            f"가격: {item['price']:,}원"
+        )
+
+    if item.get('transfers') is not None:
+        st.write(
+            f"환승: {item['transfers']}회"
+        )
+
+# ==========================================
+# 부산 버스 터미널 API 상세 테스트
+# ==========================================
+
+if st.button('부산 버스 터미널 API 테스트'):
+
+    st.subheader(
+        '부산 버스 터미널 API 테스트'
+    )
+
+    # ==========================================
+    # 고속버스
+    # ==========================================
+
+    st.write('### ① 고속버스')
+
+    express_data = get_express_bus_terminal_list(
+        terminal_nm='부산',
+        num_of_rows=100
+    )
+
+    st.write('API 원본 응답')
+
+    st.json(express_data)
+
+    express_items = _extract_items(
+        express_data
+    )
+
+    st.write(
+        f'추출된 터미널 수: '
+        f'{len(express_items)}'
+    )
+
+    if express_items:
+
+        st.write('조회된 터미널')
+
+        st.dataframe(
+            express_items,
+            use_container_width=True
+        )
+
+    else:
+
+        st.error(
+            '부산 고속버스 터미널 검색 결과가 없습니다.'
+        )
+
+    # ==========================================
+    # 시외버스
+    # ==========================================
+
+    st.write('### ② 시외버스')
+
+    intercity_data = get_intercity_bus_terminal_list(
+        terminal_nm='부산',
+        num_of_rows=100
+    )
+
+    st.write('API 원본 응답')
+
+    st.json(intercity_data)
+
+    intercity_items = _extract_items(
+        intercity_data
+    )
+
+    st.write(
+        f'추출된 터미널 수: '
+        f'{len(intercity_items)}'
+    )
+
+    if intercity_items:
+
+        st.write('조회된 터미널')
+
+        st.dataframe(
+            intercity_items,
+            use_container_width=True
+        )
+
+    else:
+
+        st.error(
+            '부산 시외버스 터미널 검색 결과가 없습니다.'
+        )
+
+    # ==========================================
+    # 실제 보조 함수 반환값 테스트
+    # ==========================================
+
+    st.write('### ③ 실제 보조 함수 반환값')
+
+    # 고속버스
+    express_result = _find_first_express_terminal(
+        '부산'
+    )
+
+    st.write(
+        f'고속버스 _find_first_express_terminal("부산"): '
+        f'`{express_result}`'
+    )
+
+    # 시외버스
+    intercity_result = _find_first_intercity_terminal(
+        '부산'
+    )
+
+    st.write(
+        f'시외버스 _find_first_intercity_terminal("부산"): '
+        f'`{intercity_result}`'
+    )
+
+    # ==========================================
+    # 지역명별 보조 함수 반환값 비교
+    # ==========================================
+
+    st.write(
+        '### ④ 지역명별 터미널 ID 반환 비교'
+    )
+
+    test_cities = [
+        '부산',
+        '부산광역시'
+    ]
+
+    for city in test_cities:
+
+        st.write(
+            f'#### `{city}`'
+        )
+
+        express_id = _find_first_express_terminal(
+            city
+        )
+
+        intercity_id = _find_first_intercity_terminal(
+            city
+        )
+
+        st.write(
+            f'고속버스: `{express_id}`'
+        )
+
+        st.write(
+            f'시외버스: `{intercity_id}`'
+        )
 
 
 # ==========================================
@@ -208,9 +966,15 @@ if 'time_after' not in st.session_state:
     st.session_state.time_after = None
 
 # 항공/교통 API 요청 데이터 저장
-if 'transport_request' not in st.session_state:
-    st.session_state.transport_request = None
+if 'transport_requests' not in st.session_state:
+    st.session_state.transport_requests = None
 
+
+if 'transport_results' not in st.session_state:
+    st.session_state.transport_results = {}
+
+if 'transport_ids' not in st.session_state:
+    st.session_state.transport_ids = None
 
 # ==========================================
 # 사용자 입력 영역
@@ -235,7 +999,9 @@ if st.sidebar.button('추천 내용 초기화'):
     st.session_state.departure = None
     st.session_state.transport_option = None
     st.session_state.time_after = None
-    st.session_state.transport_request = None
+    st.session_state.transport_requests = None
+    st.session_state.transport_results = {}
+    st.session_state.transport_ids = None
 
     st.toast('추천 내용이 초기화 되었습니다.')
 
@@ -317,16 +1083,50 @@ if selected_tab != st.session_state.current_tab:
 
 
 # ==========================================
-# 더미 API 데이터
-# 실제 API 연결 전 UI 테스트를 위한 더미 데이터
+# 더미 데이터
+# 실제 모델 연결 전 UI 테스트를 위한 더미 데이터
 # ==========================================
 
+# 여행지 추천
+# def recommend_destination(gender, age, theme, num_of_people):
+# 	"""
+# 	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
+# 	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
+# 	"""
+# 	return [
+#         {
+#             'rank': 1,
+#             'destination': '서울특별시',
+#             'score': 91.7
+#         },
+#         {
+#             'rank': 2,
+#             'destination': '인천광역시',
+#             'score': 82.9
+#         },
+#         {
+#             'rank': 3,
+#             'destination': '부산광역시',
+#             'score': 77.1
+#         }
+#     ]
+
+# 예상 경비
+# def estimate_expense(period, destination, num_of_people, theme):
+# 	"""
+# 	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
+# 	1인당 1일 예상 경비를 예측해 반환합니다.
+# 	"""
+# 	return 300000
+
+# API
 def create_dummy_api_context(destinations):
 
     api_context = []
 
-    for destination in destinations:
+    for recommendation in destinations:
 
+        destination = recommendation['destination']
         # 여행지별 더미 데이터
         data = {
 
@@ -335,26 +1135,61 @@ def create_dummy_api_context(destinations):
             'accommodations': [
                 {
                     'name': f'{destination} K-Guide 호텔',
-                    'rating': 4.7,
-                    'price': 120000,
-                    'address': f'{destination} 중심가',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'address': f'{destination} 중심가 123',
+                    'url': 'http://place.map.kakao.com/00000001'
+                },
+                {
+                    'name': f'{destination} 시티 호텔',
+                    'address': f'{destination} 중앙로 45',
+                    'url': 'http://place.map.kakao.com/00000002'
+                },
+                {
+                    'name': f'{destination} 관광호텔',
+                    'address': f'{destination} 해안로 120',
+                    'url': 'http://place.map.kakao.com/00000003'
+                },
+                {
+                    'name': f'{destination} 스테이',
+                    'address': f'{destination} 문화길 18',
+                    'url': 'http://place.map.kakao.com/00000004'
+                },
+                {
+                    'name': f'{destination} 비즈니스 호텔',
+                    'address': f'{destination} 교통광장로 112',
+                    'url': 'http://place.map.kakao.com/00000005'
                 }
             ],
 
             'restaurants': [
                 {
-                    'name': f'{destination} 대표 맛집',
+                    'name': f'{destination} 밤실마을',
                     'category': '한식',
-                    'rating': 4.6,
-                    'price': 20000,
-                    'address': f'{destination} 맛집거리',
-                    'opening_hours': '11:00~21:00',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'address': f'{destination} 북구 밤실로 163-9',
+                    'opening_hours': '11:00~22:00',
+                    'representative_menu': '국밥 / 김밥 / 국수 등',
+                    'mapx': '126.9344',
+                    'mapy': '35.1617',
+                    'description': f'{destination} 지역의 한식 맛집입니다.',
+                },
+                {
+                    'name': f'{destination} 모나리자531',
+                    'category': '카페/전통찻집',
+                    'address': f'{destination} 북구 삼소로 352',
+                    'opening_hours': '평일 10:00~22:00 / 식사 10:30~19:30',
+                    'representative_menu': '모과티 / 아메리카노 / 에이드 등',
+                    'mapx': '126.8714',
+                    'mapy': '35.1720',
+                    'description': f'{destination}의 분위기 좋은 카페/전통찻집입니다.',
+                },
+                {
+                    'name': f'{destination} 해피맛집',
+                    'category': '일식',
+                    'address': f'{destination} 서구 상무중앙로 16',
+                    'opening_hours': '12:00~22:00',
+                    'representative_menu': '연어 / 돈까스 / 하이볼 등',
+                    'mapx': '126.8587',
+                    'mapy': '35.1520',
+                    'description': f'{destination}에서 다양한 메뉴를 즐길 수 있는 맛집입니다.',
                 }
             ],
 
@@ -362,59 +1197,94 @@ def create_dummy_api_context(destinations):
                 'max_temp': 32,
                 'min_temp': 21,
                 'weather': '맑음',
-                'rain_probability': 20,
-                'air_quality': '좋음'
+                'rain_probability': 20
             },
 
-            'attractions': [
+            'tourist_attractions': [
                 {
-                    'name': f'{destination} 대표 관광지',
-                    'category': '문화관광',
-                    'description': f'{destination}의 대표적인 관광 명소입니다.',
-                    'rating': 4.8,
-                    'address': f'{destination} 관광지',
+                    'name': f'{destination} 전통문화관',
+                    'category': '전시관',
+                    'address': f'{destination} 동구 의재로 222',
                     'opening_hours': '09:00~18:00',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'mapx': '126.9524',
+                    'mapy': '35.1617',
+                    'description': f'{destination}의 전통과 문화를 체험할 수 있는 매력적인 전시관 공간입니다.'
+                },
+                {
+                    'name': f'{destination} 중외공원',
+                    'category': '공원',
+                    'address': f'{destination} 북구 무등로 1550',
+                    'opening_hours': '상시 개방',
+                    'mapx': '126.9622',
+                    'mapy': '35.2162',
+                    'description': f'{destination}의 아름다운 풍경과 볼거리가 가득한 인기 공원입니다.'
+                },
+                {
+                    'name': f'{destination} 운천저수지',
+                    'category': '강',
+                    'address': f'{destination} 서구 운천로 165',
+                    'opening_hours': '상시 개방',
+                    'mapx': '126.8582',
+                    'mapy': '35.1472',
+                    'description': f'{destination}에서 여행 중 잠깐 들러볼 만한 매력적인 장소입니다.'
                 }
             ],
 
-            'flights': [
-                {
-                    'transport_type': 'flight',
-                    'name': '대한항공',
-                    'departure': '김포공항',
-                    'arrival': destination,
-                    'departure_time': '09:30',
-                    'arrival_time': '10:40',
-                    'duration': 70,
-                    'price': 85000,
-                    'price_type': 'api',
-                    'transfers': 0
-                }
-            ],
+            # 'flights': [
+            #     {
+            #         'transport_type': 'flight',
+            #         'name': '대한항공',
+            #         'departure': '김포공항',
+            #         'arrival': destination,
+            #         'departure_time': '09:30',
+            #         'arrival_time': '10:40',
+            #         'duration': 70,
+            #         'price': 85000,
+            #         'price_type': 'api',
+            #         'transfers': 0
+            #     }
+            # ],
 
-            'transportation': [
-                {
-                    'transport_type': 'train',
-                    'name': 'KTX',
-                    'departure': '서울역',
-                    'arrival': destination,
-                    'departure_time': '09:30',
-                    'arrival_time': '10:40',
-                    'duration': 120,
-                    'price': 50000,
-                    'price_type': 'api',
-                    'transfers': 0
-                }
-            ]
+            # 'transportation': [
+            #     {
+            #         'transport_type': 'train',
+            #         'name': 'KTX',
+            #         'departure': '서울역',
+            #         'arrival': destination,
+            #         'departure_time': '09:30',
+            #         'arrival_time': '10:40',
+            #         'duration': 120,
+            #         'price': 50000,
+            #         'price_type': 'api',
+            #         'transfers': 0
+            #     }
+            # ]
         }
 
         api_context.append(data)
 
     return api_context
 
+# ==========================================
+# API 데이터
+# 날씨, 관광지, 숙소, 맛집 정보
+# ==========================================
+def create_api_context(destinations):
+    api_context = []
+
+    for recommendation in destinations:
+        destination = recommendation['destination']
+        restaurant_attraction = recommend_places(destination, theme)
+        data = {
+            'destination' : destination,
+            'accommodations' : get_accommodations(destination),
+            'weather' : get_weather(destination),
+            'restaurants': restaurant_attraction['restaurants'],
+            'tourist_attractions' : restaurant_attraction['tourist_attractions']
+        }
+        api_context.append(data)
+    
+    return api_context
 
 # ==========================================
 # 여행 추천 결과
@@ -432,11 +1302,13 @@ if selected_tab == '여행 추천':
                 st.write('여행지 추천 중...')
 
                 st.session_state.destinations = recommend_destination(
-                    gender,
-                    age,
-                    theme,
-                    num_of_people
-                )
+                                    gender=gender,
+                                    age=age,
+                                    num_of_people=num_of_people,
+                                    theme=theme,
+                                    preferred_area=area,
+                                    top_n=3
+                                )
 
                 # 추천 결과가 없는 경우
                 if not st.session_state.destinations:
@@ -447,31 +1319,25 @@ if selected_tab == '여행 추천':
 
                 recommendation_context=[]
 
-                for destination in st.session_state.destinations:
-                    # 성수기 / 비수기
-                    try:
-                        peak = estimate_peak.is_peak_season(
-                            trip_date,
-                            period,
-                            destination
-                        )
-                    except Exception:
-                        peak = None
-
+                for recommendation in st.session_state.destinations:
+                    destination = recommendation['destination']
                     # 예상 경비
                     try:
                         expense = estimate_expense(
                             period,
                             destination,
                             num_of_people,
-                            theme
+                            theme,
+                            age
                         )
                     except Exception:
                         expense = None
 
                     recommendation_context.append({
+                        'rank': recommendation['rank'],
                         'destination': destination,
-                        'peak_season': peak,
+                        'score': recommendation['score'],
+                        #'peak_season': peak,
                         'expense': expense
                     })
 
@@ -485,7 +1351,7 @@ if selected_tab == '여행 추천':
                 # ------------------------------------------
                 st.write('여행 정보 준비 중...')
                 st.session_state.api_context = (
-                    create_dummy_api_context(
+                    create_api_context(
                         st.session_state.destinations
                     )
                 )
@@ -503,7 +1369,223 @@ if selected_tab == '여행 추천':
             except Exception as e:
                 st.error(f'여행지 추천 중 오류가 발생했습니다. : {e}')    
 
-    if st.session_state.trip_started:
+    # ==========================================
+    # 여행 추천 결과 출력
+    # 여행지 후보 / 성수기/비수기 / 예상경비
+    # ==========================================
+
+    # ==========================================
+    # 항공 / 교통 정보 설정
+    # ==========================================
+
+    if (
+        st.session_state.trip_started
+        and st.session_state.transport_enabled is None
+    ):
+        st.subheader('이동 정보 설정')
+
+        st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
+        st.info('추천된 여행지 3곳을 기준으로 이동 정보를 조회합니다.')
+
+        departure = st.selectbox(
+            '출발 지역',
+            DEPARTURE_OPTIONS
+        )
+
+        transport_option_label = st.selectbox(
+            '교통편 추천 기준',
+            list(OPTION_OPTIONS.keys())
+        )
+
+        use_time_filter = st.checkbox(
+            '원하는 출발 시간 설정'
+        )
+
+        if use_time_filter:
+            time_after = st.time_input(
+                '이 시간 이후 출발'
+            )
+        else:
+            time_after = None
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            submit_transport = st.button(
+                '입력하고 추천받기',
+                use_container_width=True
+            )
+
+        with col2:
+            skip_transport = st.button(
+                '건너뛰기',
+                use_container_width=True
+            )
+
+        # ==========================================
+        # 입력하고 추천받기
+        # ==========================================
+
+        if submit_transport:
+            st.session_state.transport_enabled = True
+
+            st.session_state.departure = departure
+
+            st.session_state.transport_option = (
+                OPTION_OPTIONS[transport_option_label]
+            )
+
+            st.session_state.time_after = (
+                time_after.strftime('%H:%M')
+                if time_after is not None
+                else None
+            )
+
+            # 여행지별 API 요청 데이터 생성
+
+            option = OPTION_OPTIONS[
+                transport_option_label
+            ]
+
+            time_after_str = (
+                time_after.strftime('%H:%M')
+                if time_after is not None
+                else None
+            )
+
+            try:
+
+                with st.spinner(
+                    '교통편 정보를 조회하고 있습니다...'
+                ):
+
+                    transport_results = {}
+
+                    # 추천 여행지 3곳 각각 조회
+                    # 한 여행지에서 오류가 나더라도 나머지 여행지는 계속 조회합니다.
+                    for recommendation in (
+                        st.session_state.destinations
+                    ):
+
+                        destination = (
+                            recommendation['destination']
+                        )
+
+                        try:
+                            transport_ids, results = (
+                                get_transport_results(
+                                    departure=departure,
+                                    arrival=destination,
+                                    trip_date=trip_date,
+                                    option=option,
+                                    time_after=time_after_str
+                                )
+                            )
+
+                        except Exception as destination_error:
+                            print(
+                                f'{departure} → {destination} '
+                                f'교통편 조회 실패: {destination_error}'
+                            )
+
+                            transport_ids = {
+                                'train': {
+                                    'dep_place_id': None,
+                                    'arr_place_id': None
+                                },
+                                'express_bus': {
+                                    'dep_terminal_id': None,
+                                    'arr_terminal_id': None
+                                },
+                                'intercity_bus': {
+                                    'dep_terminal_id': None,
+                                    'arr_terminal_id': None
+                                },
+                                'flight': {
+                                    'depAirportId': None,
+                                    'arrAirportId': None
+                                }
+                            }
+
+                            results = []
+
+                        transport_results[destination] = {
+                            'transport_ids': transport_ids,
+                            'results': results
+                        }
+
+                # 실제 조회 결과 저장
+
+                st.session_state.transport_results = (
+                    transport_results
+                )
+
+                # 실제 교통 API 결과를 API 컨텍스트에도 반영
+                for api_data in st.session_state.api_context:
+
+                    destination = api_data.get(
+                        'destination'
+                    )
+
+                    transport_data = transport_results.get(
+                        destination,
+                        {}
+                    )
+
+                    actual_results = transport_data.get(
+                        'results',
+                        []
+                    )
+
+                    api_data['transportation'] = [
+                        item
+                        for item in actual_results
+                        if item.get('transport_type')
+                        != 'flight'
+                    ]
+
+                    api_data['flights'] = [
+                        item
+                        for item in actual_results
+                        if item.get('transport_type')
+                        == 'flight'
+                    ]
+
+                # 기존 요청 정보 저장
+                st.session_state.transport_requests = [
+                    {
+                        'departure': departure,
+                        'arrival': destination,
+                        'option': option,
+                        'time_after': time_after_str,
+                        'transport_ids': (
+                            transport_results[destination]
+                            ['transport_ids']
+                        )
+                    }
+                    for destination in transport_results
+                ]
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f'교통편 조회 중 오류가 발생했습니다: {e}'
+                )
+
+        # ==========================================
+        # 건너뛰기
+        # ==========================================
+
+        if skip_transport:
+            st.session_state.transport_enabled = False
+            st.rerun()
+
+    if (
+        st.session_state.trip_started
+        and st.session_state.transport_enabled is not None
+    ):
 
         st.header('추천 여행지')
 
@@ -520,29 +1602,66 @@ if selected_tab == '여행 추천':
             with cols[i]:
 
                 destination = recommendation['destination']
-                peak = recommendation['peak_season']
                 expense = recommendation['expense']
 
                 st.subheader(destination)
 
-                # 성수기 / 비수기 표시
-                if peak >= 0.75:
-                    st.warning('매우 혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.5:
-                    st.warning('혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.25:
-                    st.success('한적할 것으로 예상됩니다.')
-                elif peak < 0.25 :
-                    st.success('매우 한적할 것으로 예상됩니다.')
-                else:
-                    st.info('성수기 여부를 확인할 수 없습니다.')
-
                 # 예상 경비
                 if expense is not None:
+
+                    # 1일 1인 예상 경비
+                    daily_expense = expense
+
+                    # 1인 기본 경비
+                    base_expense = daily_expense * period
+
+                    # 항공료
+                    flight_expense = 0
+                    
+                    if st.session_state.transport_enabled:
+
+                        transport_data = (
+                            st.session_state.transport_results
+                            .get(destination, {})
+                        )
+
+                        transport_results = (
+                            transport_data.get('results', [])
+                        )
+
+                        flights = [
+                            item
+                            for item in transport_results
+                            if item.get('transport_type') == 'flight'
+                        ]
+
+                        if flights:
+
+                            flight_price = flights[0].get('price')
+
+                            if flight_price is not None:
+
+                                flight_expense = (
+                                    flight_price * 2
+                                )
+
+                    total_expense = base_expense + flight_expense
+
+                    recommendation['daily_expense'] = daily_expense
+                    recommendation['base_expense'] = base_expense
+                    recommendation['flight_expense'] = flight_expense
+                    recommendation['total_expense'] = total_expense
+                    
+                    st.write(f'1인 1일 예상 경비 : {daily_expense:,}원')
+
+                    if st.session_state.transport_enabled and flight_expense > 0:
+                        st.write(f'왕복 항공료: {flight_expense:,}원')
+
                     st.metric(
-                        '예상 경비',
-                        f'{expense:,}원'
+                        '1인 총 예상 경비',
+                        f'{total_expense:,}원'
                     )
+
                 else:
                     st.info('예상 경비를 확인할 수 없습니다.')
 
@@ -582,21 +1701,15 @@ elif selected_tab == 'K-Guide AI':
             f"{selected_recommendation['destination']}"
         )
 
-        st.write(
-            f"예상 경비: "
-            f"{selected_recommendation['expense']:,}원"
-        )
+        total_expense = selected_recommendation.get('total_expense')
 
-        if selected_recommendation['peak_season'] >= 0.75:
-            st.write('매우 혼잡')
-        elif selected_recommendation['peak_season'] >= 0.5:
-            st.write('혼잡')
-        elif selected_recommendation['peak_season'] >= 0.25:
-            st.write('한적')
-        elif selected_recommendation['peak_season'] < 0.25:
-            st.write('매우 한적')
+        if total_expense is not None:
+            st.write(
+            f"1인당 예상 총 경비: "
+            f"{total_expense:,}원"
+        )
         else:
-            st.write('성수기 정보 확인 불가')
+            st.info('예상 총 경비를 확인할 수 없습니다.')
 
         # ==========================================
         # 사용자 기본 조건 전달 테스트
@@ -615,8 +1728,8 @@ elif selected_tab == 'K-Guide AI':
 
         st.divider()
         
-        # 숙소, 음식점 정보
-        st.header('숙소, 음식점 정보')
+        # 숙소, 날씨 정보
+        st.header('숙소, 날씨 정보')
 
         col1, col2 = st.columns(2)
 
@@ -645,95 +1758,33 @@ elif selected_tab == 'K-Guide AI':
 
                 if hotel_list:
 
-                    hotel = hotel_list[0]
-                    # 숙소명
-                    st.info(hotel['name'])
-                    # 별점
-                    st.write(f"별점: {hotel['rating']}")
-                    # 가격
-                    st.write(f"1박 약 {hotel['price']:,}원")
-                    # 주소
-                    st.write(f"주소: {hotel['address']}")
+                    st.caption(f"추천 숙소 ({min(5, len(hotel_list))}곳)")
+                    st.caption(f"숙소별 상세 평점 및 실시간 가격은 카카오맵 상세페이지 링크에서 확인 가능합니다.")
+                    for i, hotel in enumerate(hotel_list[:5], start=1):
 
-                    # url
-                    if hotel.get('url'):
+                        # 숙소명
+                        st.info(f"{i}. {hotel['name']}")
+                        # 주소
+                        st.write(f"주소: {hotel['address']}")
 
-                        st.link_button(
-                            '상세정보',
-                            hotel['url']
-                        )
+                        # 상세보기 및 예약 링크
+                        if hotel.get('url'):
 
-                    # 지도 시각화
-                    if(
-                        hotel.get('latitude') is not None
-                        and hotel.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[hotel['latitude']],
-                            'lon':[hotel['longitude']]
-                        })
+                            st.link_button(
+                                '상세보기 및 예약',
+                                hotel['url']
+                            )
+
+                        if i < min(5, len(hotel_list)):
+                            st.divider()
 
                     else: st.info('추천 숙소 정보가 없습니다.')
 
                 else:
                     st.info('숙소 정보를 불러오는 중입니다.')
 
-        # 맛집
-        with col2:
-            st.subheader('추천 맛집')
-            
-            if selected_api_context:
-
-                restaurant_list = selected_api_context.get('restaurants', [])
-
-                if restaurant_list:
-
-                    restaurant = restaurant_list[0]
-                    # 음식점명
-                    st.info(restaurant['name'])
-                    # 음식 종류
-                    st.write(f"음식 종류: {restaurant['category']}")
-                    # 별점
-                    st.write(f"별점: {restaurant['rating']}")
-                    # 가격
-                    st.write(f"가격: 약 {restaurant['price']:,}원")
-                    # 주소
-                    st.write(f"주소: {restaurant['address']}")
-                    # 영업시간
-                    st.write(f"영업시간: {restaurant['opening_hours']}")
-
-                    # url
-                    if restaurant.get('url'):
-
-                        st.link_button(
-                            '상세 정보',
-                            restaurant['url']
-                        )
-
-                    # 지도 시각화
-                    if(
-                        restaurant.get('latitude') is not None
-                        and restaurant.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[restaurant['latitude']],
-                            'lon':[restaurant['longitude']]
-                        })     
-                                       
-                else:
-                    st.info('추천 맛집 정보가 없습니다.')
-
-            else:           
-                st.info('맛집 정보를 불러오는 중입니다.')
-
-
-        # 날씨, 관광지 추천
-        st.header('날씨, 관광지 추천')
-
-        col1, col2 = st.columns(2)
-
         # 날씨
-        with col1:
+        with col2:
             st.subheader('날씨 정보')
 
             if selected_api_context:
@@ -741,17 +1792,18 @@ elif selected_tab == 'K-Guide AI':
                 weather = selected_api_context.get('weather', {})
 
                 if weather:
-                    # 기온
-                    st.info(
-                        f"최고 {weather['max_temp']}°C\n"
-                        f"최저 {weather['min_temp']}°C"
-                    )
+
+                    st.caption('실시간 기상 예보')
+
                     # 날씨
-                    st.write(f"날씨: {weather['weather']}")
+                    st.info(f"날씨: {weather['weather']}")
+                    # 기온
+                    st.write(
+                        f"최고 기온 {weather['max_temp']}°C\n"
+                        f"최저 기온 {weather['min_temp']}°C"
+                    )
                     # 강수 확률
                     st.write(f"강수 확률: {weather['rain_probability']}%")
-                    # 미세먼지
-                    st.write(f"미세먼지: {weather['air_quality']}")
 
                 else:
                     st.info('날씨 정보가 없습니다.')
@@ -760,247 +1812,248 @@ elif selected_tab == 'K-Guide AI':
                 st.info('날씨 정보를 불러오는 중입니다.')
 
 
-        with col2:
-            st.subheader('추천 관광지')
+        # 맛집, 관광지 추천
+        st.header('맛집, 관광지 추천')
 
+        col1, col2 = st.columns(2)
+
+        # 맛집
+        with col1:
+            st.subheader('추천 맛집')
+            
             if selected_api_context:
 
-                attraction_list = selected_api_context.get(
-                    'attractions',
-                    []
-                )
+                restaurant_list = selected_api_context.get('restaurants', [])
 
-                if attraction_list:
+                if restaurant_list:
 
-                    attraction = attraction_list[0]
-                    # 관광지명
-                    st.info( attraction['name'])
-                    # 관광지 테마
-                    st.write(f"테마: {attraction['category']}")
-                    # 설명
-                    st.write(attraction['description'])
-                    # 별점
-                    st.write(f"별점: {attraction['rating']}")
-                    # 주소
-                    st.write(f"주소: {attraction['address']}")
-                    # 운영시간
-                    st.write(f"운영시간: {attraction['opening_hours']}")
+                    st.caption(f'추천 맛집 ({len(restaurant_list)}곳)')
 
-                    # url
-                    if attraction.get('url'):
+                    for i, restaurant in enumerate(restaurant_list[:3], start=1):
 
-                        st.link_button(
-                            '상세 정보',
-                            attraction['url']
-                        )
+                        # 음식점명 (카테고리)
+                        st.info(f"{i}. {restaurant['name']} ({restaurant['category']})")
+                        # 주소
+                        st.write(f"주소: {restaurant['address']}")
+                        # 운영시간
+                        st.write(f"운영시간: {restaurant['opening_hours']}")
+                        # 대표메뉴
+                        # st.write(f"대표메뉴: {restaurant['representative_menu']}")
+                        # 특징
+                        st.write(f"특징: {restaurant['description']}")
 
-                    # 지도 시각화
-                    if(
-                        attraction.get('latitude') is not None
-                        and attraction.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[attraction['latitude']],
-                            'lon':[attraction['longitude']]
-                        })
+                        # 지도 시각화
+                        if(
+                            restaurant.get('mapy') is not None
+                            and restaurant.get('mapx') is not None
+                        ):
+                            try:
+                                lat = float(restaurant['mapy'])
+                                lon = float(restaurant['mapx'])
+                                st.map({
+                                    'lat':[lat],
+                                    'lon':[lon]
+                                })     
+                            except(TypeError, ValueError):
+                                st.info('지도 좌표 정보를 표시할 수 없습니다.')
 
+                        if i < min(3, len(restaurant_list)):
+                            st.divider()
+                                       
+                else:
+                    st.info('추천 맛집 정보가 없습니다.')
+
+            else:           
+                st.info('맛집 정보를 불러오는 중입니다.')
+
+        # 관광지
+        with col2:
+            st.subheader('추천 관광지')
+            
+            if selected_api_context:
+
+                attraction_list = selected_api_context.get('tourist_attractions', [])
+
+                if attraction_list:      
+
+                    for i, attraction in enumerate(attraction_list[:3], start=1):
+
+                        # 광광지명 (카테고리)
+                        st.info(f"{i}. {attraction['name']} ({attraction['category']})")
+                        # 주소
+                        st.write(f"주소: {attraction['address']}")
+                        # 운영시간
+                        st.write(f"운영시간: {attraction['opening_hours']}")
+                        # 특징
+                        st.write(f"특징: {attraction['description']}")
+
+                        # 예상 혼잡도
+                        congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
+                        if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
+                            rate_str = '혼잡도를 예상할 수 없습니다'
+                        elif congestion_rate >= 0.75:
+                            rate_str = '매우 혼잡'
+                        elif congestion_rate >= 0.5:
+                            rate_str = '혼잡'
+                        elif congestion_rate >= 0.25:
+                            rate_str = '한적'
+                        else:
+                            rate_str = '매우 한적'
+                        st.write('예상 혼잡도 :', rate_str)
+
+                        # 지도 시각화
+                        if(
+                            attraction.get('mapy') is not None
+                            and attraction.get('mapx') is not None
+                        ):
+                            try:
+
+                                lat = float(attraction['mapy'])
+                                lon = float(attraction['mapx'])
+
+                                st.map({
+                                    'lat':[lat],
+                                    'lon':[lon]
+                                })
+
+                            except(TypeError, ValueError):
+                                st.info('지도 좌표 정보를 표시할 수 없습니다.')
+
+
+                        if i < min(3, len(attraction_list)):
+                            st.divider()
+                                       
                 else:
                     st.info('추천 관광지 정보가 없습니다.')
 
-            else:
+            else:           
                 st.info('관광지 정보를 불러오는 중입니다.')
 
+        # 항공 / 교통
 
-        # ==========================================
-        # 항공 / 교통 정보 설정
-        # ==========================================   
-        
-        if (
-            selected_recommendation is not None
-            and st.session_state.transport_enabled is None
-        ):
-            st.subheader('이동 정보 설정')
+        if st.session_state.transport_enabled:
 
-            st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
+            st.header('항공편, 교통편')
 
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                departure = st.selectbox(
-                    '출발 지역',
-                    DEPARTURE_OPTIONS
-                )
-
-            with col2:
-
-                arrival = selected_recommendation['destination']
-
-                st.text_input(
-                    '도착 지역',
-                    value=arrival,
-                    disabled=True
-                )
-
-            transport_option_label = st.selectbox(
-                '교통편 추천 기준',
-                list(OPTION_OPTIONS.keys())
+            # 현재 선택한 여행지의 교통 결과만 가져오기
+            transport_data = (
+                st.session_state.transport_results
+                .get(selected_destination, {})
             )
 
-            use_time_filter = st.checkbox(
-                '원하는 출발 시간 설정'
+            transport_results = (
+                transport_data.get('results', [])
             )
 
-            if use_time_filter:
+            if not transport_results:
 
-                time_after = st.time_input(
-                    '이 시간 이후 출발',
-                    value=None
-                )
+                if (
+                    _normalize_city_for_compare(
+                        st.session_state.departure
+                    )
+                    == _normalize_city_for_compare(
+                        selected_destination
+                    )
+                ):
+                    st.info(
+                        '출발지와 여행지가 동일 지역이므로 '
+                        '교통편 조회를 생략했습니다.'
+                    )
+                else:
+                    st.warning(
+                        '조건에 맞는 교통편이 없습니다.'
+                    )
 
             else:
 
-                time_after = None
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                if st.button(
-                    '입력하고 추천받기',
-                    use_container_width=True
-                ):
-
-                    st.session_state.transport_enabled = True
-
-                    st.session_state.departure = departure
-
-                    st.session_state.transport_option = (
-                        OPTION_OPTIONS[transport_option_label]
+                st.caption(
+                    f"출발지: {st.session_state.departure} "
+                    f"| 추천 기준: {st.session_state.transport_option}"
+                    + (
+                        f" | {st.session_state.time_after} 이후"
+                        if st.session_state.time_after
+                        else ""
                     )
+                )
 
-                    st.session_state.time_after = (
-                        time_after.strftime('%H:%M')
-                        if time_after is not None
-                        else None
-                    )
+                # 항공
+                flights = [
+                    item
+                    for item in transport_results
+                    if item.get('transport_type') == 'flight'
+                ]
 
-                    # API 요청 데이터
-                    st.session_state.transport_request = {
-                        'departure': departure,
-                        'arrival': selected_recommendation['destination'],
-                        'option': OPTION_OPTIONS[transport_option_label],
-                        'time_after': (
-                            time_after.strftime('%H:%M')
-                            if time_after is not None
-                            else None
-                        )
-                    }
-                    st.rerun()
+                # 기차 / 고속버스 / 시외버스
+                transportation = [
+                    item
+                    for item in transport_results
+                    if item.get('transport_type') != 'flight'
+                ]
 
-            with col2:
+                col1, col2 = st.columns(2)
 
-                if st.button(
-                    '건너뛰기',
-                    use_container_width=True
-                ):
+                # 항공편
 
-                    st.session_state.transport_enabled = False
-                    st.session_state.departure = None
-                    st.session_state.transport_option = None
-                    st.session_state.time_after = None
-                    st.session_state.transport_request = None
+                with col1:
 
-                    st.rerun()
-
-        if st.session_state.transport_enabled:
-            # 항공편, 교통편
-            st.header('항공편, 교통편')
-
-            col1, col2 = st.columns(2)
-
-            # 항공편
-            with col1:
-                st.subheader('항공편')
-
-                if selected_api_context:
-
-                    flights = selected_api_context.get(
-                        'flights',
-                        []
-                    )
+                    st.subheader('항공편')
 
                     if flights:
 
-                        flight = flights[0]
+                        for i, flight in enumerate(
+                            flights[:3],
+                            start=1
+                        ):
 
-                        # 항공사
-                        st.info(flight['name'])
+                            st.caption(
+                                f'항공편 {i}'
+                            )
 
-                        # 출발 / 도착
-                        st.write(f"{flight['departure']} ➤ {flight['arrival']}")
+                            _display_transport_item(
+                                flight
+                            )
 
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {flight['departure_time']}")
-                        st.write(f"도착: {flight['arrival_time']}")
-
-                        # 소요 시간
-                        if flight['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(flight['duration'])}")
-
-                        # 가격
-                        if flight['price'] is not None:
-                            st.write(f"가격: {flight['price']:,}원")
+                            if i < min(3, len(flights)):
+                                st.divider()
 
                     else:
-                        st.info('항공편 정보가 없습니다.')
 
-                else:
-                    st.info('항공편 정보를 불러오는 중입니다.')
+                        st.info(
+                            '조건에 맞는 항공편이 없습니다.'
+                        )
 
+                # 교통편
 
-            # 교통편
-            with col2:
-                st.subheader('교통편')
+                with col2:
 
-                if selected_api_context:
-
-                    transportation = selected_api_context.get(
-                        'transportation',
-                        []
-                    )
+                    st.subheader('교통편')
 
                     if transportation:
 
-                        transport = transportation[0]
-                        # 교통수단
-                        st.info(transport['name'])
+                        for i, transport in enumerate(
+                            transportation[:3],
+                            start=1
+                        ):
 
-                        # 교통수단 종류
-                        st.write(f"교통수단: {transport['transport_type']}")
-                        
-                        # 출발 / 도착
-                        st.write(f"{transport['departure']} ➤ {transport['arrival']}")
+                            st.caption(
+                                f'교통편 {i}'
+                            )
 
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {transport['departure_time']}")
-                        st.write(f"도착: {transport['arrival_time']}")
+                            _display_transport_item(
+                                transport
+                            )
 
-                        # 소요 시간
-                        if transport['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(transport['duration'])}")
-
-                        # 가격
-                        if transport['price'] is not None:
-                            st.write(f"가격: {transport['price']:,}원")
+                            if i < min(
+                                3,
+                                len(transportation)
+                            ):
+                                st.divider()
 
                     else:
-                        st.info('교통편 정보가 없습니다.')
 
-                else:
-                    st.info('교통편 정보를 불러오는 중입니다.')
-
+                        st.info(
+                            '조건에 맞는 교통편이 없습니다.'
+                        )
 
     # 대화 기록 출력
     for message in st.session_state.messages:
