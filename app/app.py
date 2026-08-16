@@ -1489,13 +1489,15 @@ if selected_tab == '여행 추천':
                                 recommended_transport.get('transport_type')
                             )
 
-                            transport_price = (
-                                recommended_transport.get('price')
-                            )
+                            # 1순위 추천 교통편이 항공인 경우 항공료 합산
+                            if recommended_transport_type == 'flight':
+                                flight_price = (
+                                    recommended_transport.get('price')
+                                )
 
-                            if transport_price is not None:
-                                # 왕복 교통비
-                                transport_expense = transport_price * 2
+                                if flight_price is not None:
+                                    # 왕복 항공료
+                                    transport_expense = flight_price * 2
 
                     total_expense = base_expense + transport_expense
 
@@ -1840,10 +1842,6 @@ elif selected_tab == 'K-Guide AI':
                     )
                 )
 
-
-                # 추천 기준에 따른 전체 교통편 1순위
-                recommended_transport = transport_results[0]
-
                 # 항공
                 flights = [
                     item
@@ -1872,16 +1870,9 @@ elif selected_tab == 'K-Guide AI':
                             flights[:3],
                             start=1
                         ):
-                            # 전체 교통편 중 추천 1순위인 경우 표시
-                            if flight is recommended_transport:
-                                st.success(
-                                    '추천 1순위 · 예상 경비에 반영'
-                                )
-
-                            else:
-                                st.caption(
-                                    f'항공편 {i}'
-                                )
+                            st.caption(
+                                f'항공편 {i}'
+                            )
 
                             _display_transport_item(
                                 flight
@@ -1908,16 +1899,9 @@ elif selected_tab == 'K-Guide AI':
                             transportation[:3],
                             start=1
                         ):
-                            # 전체 교통편 중 추천 1순위인 경우 표시
-                            if transport is recommended_transport:
-                                st.success(
-                                    '추천 1순위 · 예상 경비에 반영'
-                                )
-
-                            else:
-                                st.caption(
-                                    f'교통편 {i}'
-                                )
+                            st.caption(
+                                f'교통편 {i}'
+                            )
 
                             _display_transport_item(
                                 transport
