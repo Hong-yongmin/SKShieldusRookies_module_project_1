@@ -330,12 +330,64 @@ def _find_preferred_terminal(terminals, preferred_names):
     return terminals[0].get('terminalId')
 
 
+def _find_terminal_by_name(
+    terminal_type,
+    terminal_name,
+):
+    """대표 터미널 이름으로 터미널 ID를 직접 조회합니다."""
+
+    if terminal_type == 'express_bus':
+        data = get_express_bus_terminal_list(
+            terminal_nm=terminal_name,
+            num_of_rows=100
+        )
+    else:
+        data = get_intercity_bus_terminal_list(
+            terminal_nm=terminal_name,
+            num_of_rows=100
+        )
+
+    terminals = _extract_items(data)
+
+    # 터미널명이 정확히 일치하는 결과를 우선 사용
+    for terminal in terminals:
+        if terminal.get('terminalNm') == terminal_name:
+            return terminal.get('terminalId')
+
+    # 정확히 일치하지 않는 경우 이름을 포함하는 결과 사용
+    for terminal in terminals:
+        if terminal_name in terminal.get(
+            'terminalNm',
+            ''
+        ):
+            return terminal.get('terminalId')
+
+    return None
+
+
 def _find_first_express_terminal(city_name):
 
     city_name = _normalize_bus_city_name(
         city_name
     )
 
+    preferred_names = EXPRESS_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    # 대표 터미널 이름으로 직접 검색
+    for terminal_name in preferred_names:
+
+        terminal_id = _find_terminal_by_name(
+            'express_bus',
+            terminal_name
+        )
+
+        if terminal_id:
+            return terminal_id
+
+    # 대표 터미널을 지정하지 않은 지역은 기존 방식으로 fallback
     data = get_express_bus_terminal_list(
         terminal_nm=city_name,
         num_of_rows=100
@@ -346,15 +398,7 @@ def _find_first_express_terminal(city_name):
     if not terminals:
         return None
 
-    preferred_names = EXPRESS_TERMINAL_PREFERENCE.get(
-        city_name,
-        []
-    )
-
-    return _find_preferred_terminal(
-        terminals,
-        preferred_names
-    )
+    return terminals[0].get('terminalId')
 
 
 def _find_first_intercity_terminal(city_name):
@@ -363,6 +407,23 @@ def _find_first_intercity_terminal(city_name):
         city_name
     )
 
+    preferred_names = INTERCITY_TERMINAL_PREFERENCE.get(
+        city_name,
+        []
+    )
+
+    # 대표 터미널 이름으로 직접 검색
+    for terminal_name in preferred_names:
+
+        terminal_id = _find_terminal_by_name(
+            'intercity_bus',
+            terminal_name
+        )
+
+        if terminal_id:
+            return terminal_id
+
+    # 대표 터미널을 지정하지 않은 지역은 기존 방식으로 fallback
     data = get_intercity_bus_terminal_list(
         terminal_nm=city_name,
         num_of_rows=100
@@ -373,15 +434,7 @@ def _find_first_intercity_terminal(city_name):
     if not terminals:
         return None
 
-    preferred_names = INTERCITY_TERMINAL_PREFERENCE.get(
-        city_name,
-        []
-    )
-
-    return _find_preferred_terminal(
-        terminals,
-        preferred_names
-    )
+    return terminals[0].get('terminalId')
 
 def _find_airport_id(city_name, airport_data):
     airport_name = AIRPORT_NAME_MAP.get(city_name)
