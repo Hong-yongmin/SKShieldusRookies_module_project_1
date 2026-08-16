@@ -932,190 +932,6 @@ if selected_tab != st.session_state.current_tab:
     st.session_state.current_tab = selected_tab
     st.rerun()
 
-
-# ==========================================
-# 더미 데이터
-# 실제 모델 연결 전 UI 테스트를 위한 더미 데이터
-# ==========================================
-
-# 여행지 추천
-# def recommend_destination(gender, age, theme, num_of_people):
-# 	"""
-# 	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
-# 	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
-# 	"""
-# 	return [
-#         {
-#             'rank': 1,
-#             'destination': '서울특별시',
-#             'score': 91.7
-#         },
-#         {
-#             'rank': 2,
-#             'destination': '인천광역시',
-#             'score': 82.9
-#         },
-#         {
-#             'rank': 3,
-#             'destination': '부산광역시',
-#             'score': 77.1
-#         }
-#     ]
-
-# 예상 경비
-# def estimate_expense(period, destination, num_of_people, theme):
-# 	"""
-# 	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
-# 	1인당 1일 예상 경비를 예측해 반환합니다.
-# 	"""
-# 	return 300000
-
-# API
-def create_dummy_api_context(destinations):
-
-    api_context = []
-
-    for recommendation in destinations:
-
-        destination = recommendation['destination']
-        # 여행지별 더미 데이터
-        data = {
-
-            'destination': destination,
-
-            'accommodations': [
-                {
-                    'name': f'{destination} K-Guide 호텔',
-                    'address': f'{destination} 중심가 123',
-                    'url': 'http://place.map.kakao.com/00000001'
-                },
-                {
-                    'name': f'{destination} 시티 호텔',
-                    'address': f'{destination} 중앙로 45',
-                    'url': 'http://place.map.kakao.com/00000002'
-                },
-                {
-                    'name': f'{destination} 관광호텔',
-                    'address': f'{destination} 해안로 120',
-                    'url': 'http://place.map.kakao.com/00000003'
-                },
-                {
-                    'name': f'{destination} 스테이',
-                    'address': f'{destination} 문화길 18',
-                    'url': 'http://place.map.kakao.com/00000004'
-                },
-                {
-                    'name': f'{destination} 비즈니스 호텔',
-                    'address': f'{destination} 교통광장로 112',
-                    'url': 'http://place.map.kakao.com/00000005'
-                }
-            ],
-
-            'restaurants': [
-                {
-                    'name': f'{destination} 밤실마을',
-                    'category': '한식',
-                    'address': f'{destination} 북구 밤실로 163-9',
-                    'opening_hours': '11:00~22:00',
-                    'representative_menu': '국밥 / 김밥 / 국수 등',
-                    'mapx': '126.9344',
-                    'mapy': '35.1617',
-                    'description': f'{destination} 지역의 한식 맛집입니다.',
-                },
-                {
-                    'name': f'{destination} 모나리자531',
-                    'category': '카페/전통찻집',
-                    'address': f'{destination} 북구 삼소로 352',
-                    'opening_hours': '평일 10:00~22:00 / 식사 10:30~19:30',
-                    'representative_menu': '모과티 / 아메리카노 / 에이드 등',
-                    'mapx': '126.8714',
-                    'mapy': '35.1720',
-                    'description': f'{destination}의 분위기 좋은 카페/전통찻집입니다.',
-                },
-                {
-                    'name': f'{destination} 해피맛집',
-                    'category': '일식',
-                    'address': f'{destination} 서구 상무중앙로 16',
-                    'opening_hours': '12:00~22:00',
-                    'representative_menu': '연어 / 돈까스 / 하이볼 등',
-                    'mapx': '126.8587',
-                    'mapy': '35.1520',
-                    'description': f'{destination}에서 다양한 메뉴를 즐길 수 있는 맛집입니다.',
-                }
-            ],
-
-            'weather': {
-                'max_temp': 32,
-                'min_temp': 21,
-                'weather': '맑음',
-                'rain_probability': 20
-            },
-
-            'tourist_attractions': [
-                {
-                    'name': f'{destination} 전통문화관',
-                    'category': '전시관',
-                    'address': f'{destination} 동구 의재로 222',
-                    'opening_hours': '09:00~18:00',
-                    'mapx': '126.9524',
-                    'mapy': '35.1617',
-                    'description': f'{destination}의 전통과 문화를 체험할 수 있는 매력적인 전시관 공간입니다.'
-                },
-                {
-                    'name': f'{destination} 중외공원',
-                    'category': '공원',
-                    'address': f'{destination} 북구 무등로 1550',
-                    'opening_hours': '상시 개방',
-                    'mapx': '126.9622',
-                    'mapy': '35.2162',
-                    'description': f'{destination}의 아름다운 풍경과 볼거리가 가득한 인기 공원입니다.'
-                },
-                {
-                    'name': f'{destination} 운천저수지',
-                    'category': '강',
-                    'address': f'{destination} 서구 운천로 165',
-                    'opening_hours': '상시 개방',
-                    'mapx': '126.8582',
-                    'mapy': '35.1472',
-                    'description': f'{destination}에서 여행 중 잠깐 들러볼 만한 매력적인 장소입니다.'
-                }
-            ],
-
-            # 'flights': [
-            #     {
-            #         'transport_type': 'flight',
-            #         'name': '대한항공',
-            #         'departure': '김포공항',
-            #         'arrival': destination,
-            #         'departure_time': '09:30',
-            #         'arrival_time': '10:40',
-            #         'duration': 70,
-            #         'price': 85000,
-            #         'price_type': 'api',
-            #         'transfers': 0
-            #     }
-            # ],
-
-            # 'transportation': [
-            #     {
-            #         'transport_type': 'train',
-            #         'name': 'KTX',
-            #         'departure': '서울역',
-            #         'arrival': destination,
-            #         'departure_time': '09:30',
-            #         'arrival_time': '10:40',
-            #         'duration': 120,
-            #         'price': 50000,
-            #         'price_type': 'api',
-            #         'transfers': 0
-            #     }
-            # ]
-        }
-
-        api_context.append(data)
-
-    return api_context
-
 # ==========================================
 # API 데이터
 # 날씨, 관광지, 숙소, 맛집 정보
@@ -1695,7 +1511,7 @@ elif selected_tab == 'K-Guide AI':
                         # 주소
                         st.write(f"주소: {restaurant['address']}")
                         # 운영시간
-                        st.write(f"운영시간: {restaurant['opening_hours']}")
+                        st.write(f"운영시간: {restaurant['opening_hours'].replace('~', r'\~')}")
                         # 대표메뉴
                         # st.write(f"대표메뉴: {restaurant['representative_menu']}")
                         # 특징
@@ -1742,7 +1558,7 @@ elif selected_tab == 'K-Guide AI':
                         # 주소
                         st.write(f"주소: {attraction['address']}")
                         # 운영시간
-                        st.write(f"운영시간: {attraction['opening_hours']}")
+                        st.write(f"운영시간: {attraction['opening_hours'].replace('~', r'\~')}")
                         # 특징
                         st.write(f"특징: {attraction['description']}")
 

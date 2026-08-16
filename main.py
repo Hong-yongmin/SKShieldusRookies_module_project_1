@@ -23,7 +23,6 @@ if TOUR_API_KEY:
     TOUR_API_KEY = unquote(TOUR_API_KEY)
 
 # OpenAI API 클라이언트
-load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 
 client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
