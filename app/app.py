@@ -3,10 +3,16 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import sys
-<<<<<<< HEAD
 
 # 현재 파일 기준 상위(최상위) 폴더 경로를 sys.path에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# from pathlib import Path
+# # 프로젝트 루트 경로 추가
+# PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# if str(PROJECT_ROOT) not in sys.path:
+#     sys.path.insert(0, str(PROJECT_ROOT))
 
 # from modules.functions import recommend_destination
 from model.Ruse import recommend_destination
@@ -15,15 +21,6 @@ from model.estimate_peak import EstimatePeak
 
 from main import recommend_places
 from new import get_accommodations, get_weather
-
-=======
-from pathlib import Path
-
-# 프로젝트 루트 경로 추가
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
 from model.estimate_peak import EstimatePeak
 
@@ -39,7 +36,6 @@ from transport.api import (
 )
 
 from transport.transport_service import get_transport_options
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
 # ==========================================
 # 입력값 코드
@@ -129,8 +125,6 @@ OPTION_OPTIONS = {
     "원하는 시간대": "time",
 }
 
-<<<<<<< HEAD
-=======
 AIRPORT_NAME_MAP = {
     '서울': '김포국제공항',
     '서울특별시': '김포국제공항',
@@ -172,7 +166,6 @@ AIRPORT_NAME_MAP = {
     '제주도': '제주국제공항',
 }
 
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
 # ==========================================
 # 함수
@@ -202,8 +195,6 @@ def format_duration(minutes):
         return f'{mins}분'
 
 
-<<<<<<< HEAD
-=======
 def _extract_items(data):
     """
     공공데이터 API 응답에서 item 목록만 추출합니다.
@@ -890,7 +881,6 @@ if st.button('부산 버스 터미널 API 테스트'):
         )
 
 
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 # ==========================================
 # API 환경 설정
 # ==========================================
@@ -976,12 +966,6 @@ if 'time_after' not in st.session_state:
     st.session_state.time_after = None
 
 # 항공/교통 API 요청 데이터 저장
-<<<<<<< HEAD
-if 'transport_request' not in st.session_state:
-    st.session_state.transport_request = None
-
-
-=======
 if 'transport_requests' not in st.session_state:
     st.session_state.transport_requests = None
 
@@ -992,7 +976,6 @@ if 'transport_results' not in st.session_state:
 if 'transport_ids' not in st.session_state:
     st.session_state.transport_ids = None
 
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 # ==========================================
 # 사용자 입력 영역
 # ==========================================
@@ -1016,13 +999,9 @@ if st.sidebar.button('추천 내용 초기화'):
     st.session_state.departure = None
     st.session_state.transport_option = None
     st.session_state.time_after = None
-<<<<<<< HEAD
-    st.session_state.transport_request = None
-=======
     st.session_state.transport_requests = None
     st.session_state.transport_results = {}
     st.session_state.transport_ids = None
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
     st.toast('추천 내용이 초기화 되었습니다.')
 
@@ -1104,62 +1083,50 @@ if selected_tab != st.session_state.current_tab:
 
 
 # ==========================================
-<<<<<<< HEAD
-# 더미 API 데이터
-# 실제 API 연결 전 UI 테스트를 위한 더미 데이터
-# ==========================================
-
-=======
 # 더미 데이터
 # 실제 모델 연결 전 UI 테스트를 위한 더미 데이터
 # ==========================================
 
 # 여행지 추천
-def recommend_destination(gender, age, theme, num_of_people):
-	"""
-	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
-	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
-	"""
-	return [
-        {
-            'rank': 1,
-            'destination': '서울특별시',
-            'score': 91.7
-        },
-        {
-            'rank': 2,
-            'destination': '인천광역시',
-            'score': 82.9
-        },
-        {
-            'rank': 3,
-            'destination': '부산광역시',
-            'score': 77.1
-        }
-    ]
+# def recommend_destination(gender, age, theme, num_of_people):
+# 	"""
+# 	성별, 나이, 테마, 인원수를 입력받아 관광지별 선호도를 예측합니다.
+# 	예측도가 가장 높은 상위 3개 여행지를 반환합니다.
+# 	"""
+# 	return [
+#         {
+#             'rank': 1,
+#             'destination': '서울특별시',
+#             'score': 91.7
+#         },
+#         {
+#             'rank': 2,
+#             'destination': '인천광역시',
+#             'score': 82.9
+#         },
+#         {
+#             'rank': 3,
+#             'destination': '부산광역시',
+#             'score': 77.1
+#         }
+#     ]
 
 # 예상 경비
-def estimate_expense(period, destination, num_of_people, theme):
-	"""
-	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
-	1인당 1일 예상 경비를 예측해 반환합니다.
-	"""
-	return 300000
+# def estimate_expense(period, destination, num_of_people, theme):
+# 	"""
+# 	여행 기간, 여행지, 인원수, 여행 테마를 입력받아
+# 	1인당 1일 예상 경비를 예측해 반환합니다.
+# 	"""
+# 	return 300000
 
 # API
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 def create_dummy_api_context(destinations):
 
     api_context = []
 
-<<<<<<< HEAD
-    for destination in destinations:
-
-=======
     for recommendation in destinations:
 
         destination = recommendation['destination']
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
         # 여행지별 더미 데이터
         data = {
 
@@ -1248,7 +1215,6 @@ def create_dummy_api_context(destinations):
 
     return api_context
 
-<<<<<<< HEAD
 # ==========================================
 # API 데이터
 # 날씨, 관광지, 숙소, 맛집 정보
@@ -1256,17 +1222,19 @@ def create_dummy_api_context(destinations):
 def create_api_context(destinations):
     api_context = []
 
-    for destination in destinations:
+    for recommendation in destinations:
+        destination = recommendation['destination']
         restaurant_attraction = recommend_places(destination, theme)
         data = {
             'destination' : destination,
-            'accomadations' : get_accommodations(destination),
+            'accommodations' : get_accommodations(destination),
             'weather' : get_weather(destination),
-            'restaraunts': restaurant_attraction['restaurants'],
+            'restaurants': restaurant_attraction['restaurants'],
             'attractions' : restaurant_attraction['tourist_attractions']
         }
-=======
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
+        api_context.append(data)
+    
+    return api_context
 
 # ==========================================
 # 여행 추천 결과
@@ -1286,13 +1254,8 @@ if selected_tab == '여행 추천':
                 st.session_state.destinations = recommend_destination(
                     gender,
                     age,
-<<<<<<< HEAD
                     num_of_people,
                     theme
-=======
-                    theme,
-                    num_of_people
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                 )
 
                 # 추천 결과가 없는 경우
@@ -1304,60 +1267,25 @@ if selected_tab == '여행 추천':
 
                 recommendation_context=[]
 
-<<<<<<< HEAD
-                for destination in st.session_state.destinations:
-# 성수기 여부 표시 위치 변경 예정 --------------------------------
-                    # # 성수기 / 비수기
-                    # try:
-                    #     peak = estimate_peak.is_peak_season(
-                    #         trip_date,
-                    #         period,
-                    #         destination
-                    #     )
-                    # except Exception:
-                    #     peak = None
-#---------------------------------------------------------------
-=======
                 for recommendation in st.session_state.destinations:
                     destination = recommendation['destination']
-
-                    # 성수기 / 비수기
-                    try:
-                        peak = estimate_peak.is_peak_season(
-                            trip_date,
-                            period,
-                            destination
-                        )
-
-                    except Exception as e:
-                        peak = None
-
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                     # 예상 경비
                     try:
                         expense = estimate_expense(
                             period,
                             destination,
                             num_of_people,
-<<<<<<< HEAD
                             theme,
                             age
-=======
-                            theme
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                         )
                     except Exception:
                         expense = None
 
                     recommendation_context.append({
-<<<<<<< HEAD
-                        'destination': destination,
-=======
                         'rank': recommendation['rank'],
                         'destination': destination,
                         'score': recommendation['score'],
-                        'peak_season': peak,
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
+                        #'peak_season': peak,
                         'expense': expense
                     })
 
@@ -1371,11 +1299,7 @@ if selected_tab == '여행 추천':
                 # ------------------------------------------
                 st.write('여행 정보 준비 중...')
                 st.session_state.api_context = (
-<<<<<<< HEAD
                     create_api_context(
-=======
-                    create_dummy_api_context(
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                         st.session_state.destinations
                     )
                 )
@@ -1393,9 +1317,6 @@ if selected_tab == '여행 추천':
             except Exception as e:
                 st.error(f'여행지 추천 중 오류가 발생했습니다. : {e}')    
 
-<<<<<<< HEAD
-    if st.session_state.trip_started:
-=======
     # ==========================================
     # 여행 추천 결과 출력
     # 여행지 후보 / 성수기/비수기 / 예상경비
@@ -1613,7 +1534,6 @@ if selected_tab == '여행 추천':
         st.session_state.trip_started
         and st.session_state.transport_enabled is not None
     ):
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
         st.header('추천 여행지')
 
@@ -1630,49 +1550,9 @@ if selected_tab == '여행 추천':
             with cols[i]:
 
                 destination = recommendation['destination']
-<<<<<<< HEAD
                 expense = recommendation['expense']
 
                 st.subheader(destination)
-# 성수기 여부 표시 위치 변경 예정 --------------------------------
-                # peak = recommendation['peak_season']
-                # # 성수기 / 비수기 표시
-                # if peak >= 0.75:
-                #     st.warning('매우 혼잡할 것으로 예상됩니다.')
-                # elif peak >= 0.5:
-                #     st.warning('혼잡할 것으로 예상됩니다.')
-                # elif peak >= 0.25:
-                #     st.success('한적할 것으로 예상됩니다.')
-                # elif peak < 0.25 :
-                #     st.success('매우 한적할 것으로 예상됩니다.')
-                # else:
-                #     st.info('성수기 여부를 확인할 수 없습니다.')
-#---------------------------------------------------------------
-                # 예상 경비
-                if expense is not None:
-                    st.metric(
-                        '예상 경비',
-                        f'{expense:,}원'
-                    )
-=======
-                peak = recommendation['peak_season']
-                expense = recommendation['expense']
-
-                st.subheader(destination)
-
-                # 성수기 / 비수기 표시
-                if peak is None:    # 성수기 판별 결과가 없는 경우 안내 문구 출력
-                    st.info('성수기 여부를 확인할 수 없습니다.')
-                elif peak >= 0.75:
-                    st.warning('매우 혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.5:
-                    st.warning('혼잡할 것으로 예상됩니다.')
-                elif peak >= 0.25:
-                    st.success('한적할 것으로 예상됩니다.')
-                elif peak < 0.25 :
-                    st.success('매우 한적할 것으로 예상됩니다.')
-                else:
-                    st.info('성수기 여부를 확인할 수 없습니다.')
 
                 # 예상 경비
                 if expense is not None:
@@ -1730,7 +1610,6 @@ if selected_tab == '여행 추천':
                         f'{total_expense:,}원'
                     )
 
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                 else:
                     st.info('예상 경비를 확인할 수 없습니다.')
 
@@ -1770,24 +1649,6 @@ elif selected_tab == 'K-Guide AI':
             f"{selected_recommendation['destination']}"
         )
 
-<<<<<<< HEAD
-        st.write(
-            f"예상 경비: "
-            f"{selected_recommendation['expense']:,}원"
-        )
-# 성수기 여부 표시 위치 변경 예정 --------------------------------
-        # if selected_recommendation['peak_season'] >= 0.75:
-        #     st.write('매우 혼잡')
-        # elif selected_recommendation['peak_season'] >= 0.5:
-        #     st.write('혼잡')
-        # elif selected_recommendation['peak_season'] >= 0.25:
-        #     st.write('한적')
-        # elif selected_recommendation['peak_season'] < 0.25:
-        #     st.write('매우 한적')
-        # else:
-        #     st.write('성수기 정보 확인 불가')
-#--------------------------------------------------------------
-=======
         total_expense = selected_recommendation.get('total_expense')
 
         if total_expense is not None:
@@ -1797,19 +1658,6 @@ elif selected_tab == 'K-Guide AI':
         )
         else:
             st.info('예상 총 경비를 확인할 수 없습니다.')
-
-
-        if selected_recommendation['peak_season'] >= 0.75:
-            st.write('매우 혼잡')
-        elif selected_recommendation['peak_season'] >= 0.5:
-            st.write('혼잡')
-        elif selected_recommendation['peak_season'] >= 0.25:
-            st.write('한적')
-        elif selected_recommendation['peak_season'] < 0.25:
-            st.write('매우 한적')
-        else:
-            st.write('성수기 정보 확인 불가')
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
         # ==========================================
         # 사용자 기본 조건 전달 테스트
@@ -1992,28 +1840,26 @@ elif selected_tab == 'K-Guide AI':
                     st.write(f"테마: {attraction['category']}")
                     # 설명
                     st.write(attraction['description'])
-<<<<<<< HEAD
-                    # 예상 혼잡도
-                    congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
-                    st.write('예상 혼잡도 :')
-                    if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
-                        st.write('혼잡도를 예상할 수 없습니다')
-                    elif congestion_rate >= 0.75:
-                        st.write('매우 혼잡')
-                    elif congestion_rate >= 0.5:
-                        st.write('혼잡')
-                    elif congestion_rate >= 0.25:
-                        st.write('한적')
-                    else:
-                        st.write('매우 한적')
-=======
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
                     # 별점
                     st.write(f"별점: {attraction['rating']}")
                     # 주소
                     st.write(f"주소: {attraction['address']}")
                     # 운영시간
                     st.write(f"운영시간: {attraction['opening_hours']}")
+                    # 예상 혼잡도
+                    congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
+                    if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
+                        rate_str = '혼잡도를 예상할 수 없습니다'
+                    elif congestion_rate >= 0.75:
+                        rate_str = '매우 혼잡'
+                    elif congestion_rate >= 0.5:
+                        rate_str = '혼잡'
+                    elif congestion_rate >= 0.25:
+                        rate_str = '한적'
+                    else:
+                        rate_str = '매우 한적'
+                    st.write('예상 혼잡도 :', rate_str)
+                    
 
                     # url
                     if attraction.get('url'):
@@ -2039,199 +1885,6 @@ elif selected_tab == 'K-Guide AI':
             else:
                 st.info('관광지 정보를 불러오는 중입니다.')
 
-<<<<<<< HEAD
-
-        # ==========================================
-        # 항공 / 교통 정보 설정
-        # ==========================================   
-        
-        if (
-            selected_recommendation is not None
-            and st.session_state.transport_enabled is None
-        ):
-            st.subheader('이동 정보 설정')
-
-            st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
-
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                departure = st.selectbox(
-                    '출발 지역',
-                    DEPARTURE_OPTIONS
-                )
-
-            with col2:
-
-                arrival = selected_recommendation['destination']
-
-                st.text_input(
-                    '도착 지역',
-                    value=arrival,
-                    disabled=True
-                )
-
-            transport_option_label = st.selectbox(
-                '교통편 추천 기준',
-                list(OPTION_OPTIONS.keys())
-            )
-
-            use_time_filter = st.checkbox(
-                '원하는 출발 시간 설정'
-            )
-
-            if use_time_filter:
-
-                time_after = st.time_input(
-                    '이 시간 이후 출발',
-                    value=None
-                )
-
-            else:
-
-                time_after = None
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                if st.button(
-                    '입력하고 추천받기',
-                    use_container_width=True
-                ):
-
-                    st.session_state.transport_enabled = True
-
-                    st.session_state.departure = departure
-
-                    st.session_state.transport_option = (
-                        OPTION_OPTIONS[transport_option_label]
-                    )
-
-                    st.session_state.time_after = (
-                        time_after.strftime('%H:%M')
-                        if time_after is not None
-                        else None
-                    )
-
-                    # API 요청 데이터
-                    st.session_state.transport_request = {
-                        'departure': departure,
-                        'arrival': selected_recommendation['destination'],
-                        'option': OPTION_OPTIONS[transport_option_label],
-                        'time_after': (
-                            time_after.strftime('%H:%M')
-                            if time_after is not None
-                            else None
-                        )
-                    }
-                    st.rerun()
-
-            with col2:
-
-                if st.button(
-                    '건너뛰기',
-                    use_container_width=True
-                ):
-
-                    st.session_state.transport_enabled = False
-                    st.session_state.departure = None
-                    st.session_state.transport_option = None
-                    st.session_state.time_after = None
-                    st.session_state.transport_request = None
-
-                    st.rerun()
-
-        if st.session_state.transport_enabled:
-            # 항공편, 교통편
-            st.header('항공편, 교통편')
-
-            col1, col2 = st.columns(2)
-
-            # 항공편
-            with col1:
-                st.subheader('항공편')
-
-                if selected_api_context:
-
-                    flights = selected_api_context.get(
-                        'flights',
-                        []
-                    )
-
-                    if flights:
-
-                        flight = flights[0]
-
-                        # 항공사
-                        st.info(flight['name'])
-
-                        # 출발 / 도착
-                        st.write(f"{flight['departure']} ➤ {flight['arrival']}")
-
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {flight['departure_time']}")
-                        st.write(f"도착: {flight['arrival_time']}")
-
-                        # 소요 시간
-                        if flight['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(flight['duration'])}")
-
-                        # 가격
-                        if flight['price'] is not None:
-                            st.write(f"가격: {flight['price']:,}원")
-
-                    else:
-                        st.info('항공편 정보가 없습니다.')
-
-                else:
-                    st.info('항공편 정보를 불러오는 중입니다.')
-
-
-            # 교통편
-            with col2:
-                st.subheader('교통편')
-
-                if selected_api_context:
-
-                    transportation = selected_api_context.get(
-                        'transportation',
-                        []
-                    )
-
-                    if transportation:
-
-                        transport = transportation[0]
-                        # 교통수단
-                        st.info(transport['name'])
-
-                        # 교통수단 종류
-                        st.write(f"교통수단: {transport['transport_type']}")
-                        
-                        # 출발 / 도착
-                        st.write(f"{transport['departure']} ➤ {transport['arrival']}")
-
-                        # 출발 / 도착 시간
-                        st.write(f"출발: {transport['departure_time']}")
-                        st.write(f"도착: {transport['arrival_time']}")
-
-                        # 소요 시간
-                        if transport['duration'] is not None:
-                            st.write(f"소요 시간: {format_duration(transport['duration'])}")
-
-                        # 가격
-                        if transport['price'] is not None:
-                            st.write(f"가격: {transport['price']:,}원")
-
-                    else:
-                        st.info('교통편 정보가 없습니다.')
-
-                else:
-                    st.info('교통편 정보를 불러오는 중입니다.')
-
-=======
         # 항공 / 교통
 
         if st.session_state.transport_enabled:
@@ -2357,7 +2010,6 @@ elif selected_tab == 'K-Guide AI':
                         st.info(
                             '조건에 맞는 교통편이 없습니다.'
                         )
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69
 
     # 대화 기록 출력
     for message in st.session_state.messages:
@@ -2444,8 +2096,4 @@ elif selected_tab == 'K-Guide AI':
         #         "role":"assistant",
         #         "content": full_response
         #     }
-<<<<<<< HEAD
         # )
-=======
-        # )
->>>>>>> 22846609c4b8324084961ae9c33d58b002f2cc69

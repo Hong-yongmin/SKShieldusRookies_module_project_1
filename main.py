@@ -15,16 +15,17 @@ import requests
 # ============================================================
 # 1. 환경 변수 및 클라이언트 초기화
 # ============================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-load_dotenv(os.path.join(BASE_DIR, "APIKEY.env"))
-
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv()
 # 관광공사 API 키
 TOUR_API_KEY = os.getenv("TOUR_GW_API_KEY") or os.getenv("TOUR_API_KEY")
 if TOUR_API_KEY:
     TOUR_API_KEY = unquote(TOUR_API_KEY)
 
 # OpenAI API 클라이언트
+load_dotenv()
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+
 client = OpenAI(api_key=OPENAI_KEY) if OPENAI_KEY else None
 
 BASE_URL = "https://apis.data.go.kr/B551011/KorService2"
