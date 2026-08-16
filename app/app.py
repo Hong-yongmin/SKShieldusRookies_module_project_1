@@ -731,155 +731,6 @@ def _display_transport_item(item):
             f"환승: {item['transfers']}회"
         )
 
-# ==========================================
-# 부산 버스 터미널 API 상세 테스트
-# ==========================================
-
-if st.button('부산 버스 터미널 API 테스트'):
-
-    st.subheader(
-        '부산 버스 터미널 API 테스트'
-    )
-
-    # ==========================================
-    # 고속버스
-    # ==========================================
-
-    st.write('### ① 고속버스')
-
-    express_data = get_express_bus_terminal_list(
-        terminal_nm='부산',
-        num_of_rows=100
-    )
-
-    st.write('API 원본 응답')
-
-    st.json(express_data)
-
-    express_items = _extract_items(
-        express_data
-    )
-
-    st.write(
-        f'추출된 터미널 수: '
-        f'{len(express_items)}'
-    )
-
-    if express_items:
-
-        st.write('조회된 터미널')
-
-        st.dataframe(
-            express_items,
-            use_container_width=True
-        )
-
-    else:
-
-        st.error(
-            '부산 고속버스 터미널 검색 결과가 없습니다.'
-        )
-
-    # ==========================================
-    # 시외버스
-    # ==========================================
-
-    st.write('### ② 시외버스')
-
-    intercity_data = get_intercity_bus_terminal_list(
-        terminal_nm='부산',
-        num_of_rows=100
-    )
-
-    st.write('API 원본 응답')
-
-    st.json(intercity_data)
-
-    intercity_items = _extract_items(
-        intercity_data
-    )
-
-    st.write(
-        f'추출된 터미널 수: '
-        f'{len(intercity_items)}'
-    )
-
-    if intercity_items:
-
-        st.write('조회된 터미널')
-
-        st.dataframe(
-            intercity_items,
-            use_container_width=True
-        )
-
-    else:
-
-        st.error(
-            '부산 시외버스 터미널 검색 결과가 없습니다.'
-        )
-
-    # ==========================================
-    # 실제 보조 함수 반환값 테스트
-    # ==========================================
-
-    st.write('### ③ 실제 보조 함수 반환값')
-
-    # 고속버스
-    express_result = _find_first_express_terminal(
-        '부산'
-    )
-
-    st.write(
-        f'고속버스 _find_first_express_terminal("부산"): '
-        f'`{express_result}`'
-    )
-
-    # 시외버스
-    intercity_result = _find_first_intercity_terminal(
-        '부산'
-    )
-
-    st.write(
-        f'시외버스 _find_first_intercity_terminal("부산"): '
-        f'`{intercity_result}`'
-    )
-
-    # ==========================================
-    # 지역명별 보조 함수 반환값 비교
-    # ==========================================
-
-    st.write(
-        '### ④ 지역명별 터미널 ID 반환 비교'
-    )
-
-    test_cities = [
-        '부산',
-        '부산광역시'
-    ]
-
-    for city in test_cities:
-
-        st.write(
-            f'#### `{city}`'
-        )
-
-        express_id = _find_first_express_terminal(
-            city
-        )
-
-        intercity_id = _find_first_intercity_terminal(
-            city
-        )
-
-        st.write(
-            f'고속버스: `{express_id}`'
-        )
-
-        st.write(
-            f'시외버스: `{intercity_id}`'
-        )
-
 
 # ==========================================
 # API 환경 설정
@@ -1609,15 +1460,16 @@ if selected_tab == '여행 추천':
                 # 예상 경비
                 if expense is not None:
 
-                    # 1일 1인 예상 경비
-                    daily_expense = expense
+                    # 1인 총 예상 경비
+                    base_expense = expense
 
-                    # 1인 기본 경비
-                    base_expense = daily_expense * period
+                    # 1인 1일 예상 경비
+                    daily_expense = base_expense / period
 
-                    # 항공료
-                    flight_expense = 0
-                    
+                    # 추천 교통편 비용
+                    transport_expense = 0
+                    recommended_transport_type = None
+
                     if st.session_state.transport_enabled:
 
                         transport_data = (
@@ -1629,37 +1481,44 @@ if selected_tab == '여행 추천':
                             transport_data.get('results', [])
                         )
 
-                        flights = [
-                            item
-                            for item in transport_results
-                            if item.get('transport_type') == 'flight'
-                        ]
+                        # 추천 기준에 따라 정렬된 결과 중 1순위 교통편
+                        if transport_results:
+                            recommended_transport = transport_results[0]
 
-                        if flights:
+                            recommended_transport_type = (
+                                recommended_transport.get('transport_type')
+                            )
 
-                            flight_price = flights[0].get('price')
+                            transport_price = (
+                                recommended_transport.get('price')
+                            )
 
-                            if flight_price is not None:
+                            if transport_price is not None:
+                                # 왕복 교통비
+                                transport_expense = transport_price * 2
 
-                                flight_expense = (
-                                    flight_price * 2
-                                )
-
-                    total_expense = base_expense + flight_expense
+                    total_expense = base_expense + transport_expense
 
                     recommendation['daily_expense'] = daily_expense
                     recommendation['base_expense'] = base_expense
-                    recommendation['flight_expense'] = flight_expense
+                    recommendation['transport_expense'] = transport_expense
                     recommendation['total_expense'] = total_expense
-                    
-                    st.write(f'1인 1일 예상 경비 : {daily_expense:,}원')
 
-                    if st.session_state.transport_enabled and flight_expense > 0:
-                        st.write(f'왕복 항공료: {flight_expense:,}원')
+                    st.write(
+                        f'1인 1일 예상 경비 : {daily_expense:,.0f}원'
+                    )
+
+                    if (
+                        st.session_state.transport_enabled
+                        and transport_expense > 0
+                    ):
+                        st.write(
+                            f'왕복 교통비: {transport_expense:,}원'
+                        )
 
                     st.metric(
                         '1인 총 예상 경비',
-                        f'{total_expense:,}원'
+                        f'{total_expense:,.0f}원'
                     )
 
                 else:
@@ -1968,13 +1827,22 @@ elif selected_tab == 'K-Guide AI':
 
                 st.caption(
                     f"출발지: {st.session_state.departure} "
-                    f"| 추천 기준: {st.session_state.transport_option}"
+                    f"| 추천 기준: "
+                    f"{next(
+                        label
+                        for label, code in OPTION_OPTIONS.items()
+                        if code == st.session_state.transport_option
+                        )}"
                     + (
                         f" | {st.session_state.time_after} 이후"
                         if st.session_state.time_after
                         else ""
                     )
                 )
+
+
+                # 추천 기준에 따른 전체 교통편 1순위
+                recommended_transport = transport_results[0]
 
                 # 항공
                 flights = [
@@ -2004,10 +1872,16 @@ elif selected_tab == 'K-Guide AI':
                             flights[:3],
                             start=1
                         ):
+                            # 전체 교통편 중 추천 1순위인 경우 표시
+                            if flight is recommended_transport:
+                                st.success(
+                                    '추천 1순위 · 예상 경비에 반영'
+                                )
 
-                            st.caption(
-                                f'항공편 {i}'
-                            )
+                            else:
+                                st.caption(
+                                    f'항공편 {i}'
+                                )
 
                             _display_transport_item(
                                 flight
@@ -2034,10 +1908,16 @@ elif selected_tab == 'K-Guide AI':
                             transportation[:3],
                             start=1
                         ):
+                            # 전체 교통편 중 추천 1순위인 경우 표시
+                            if transport is recommended_transport:
+                                st.success(
+                                    '추천 1순위 · 예상 경비에 반영'
+                                )
 
-                            st.caption(
-                                f'교통편 {i}'
-                            )
+                            else:
+                                st.caption(
+                                    f'교통편 {i}'
+                                )
 
                             _display_transport_item(
                                 transport
