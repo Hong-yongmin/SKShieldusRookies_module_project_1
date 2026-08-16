@@ -1,4 +1,6 @@
 .venv
+.venv/
+venv/
 .env
 *.ipynb
 peak_model_fit.py

@@ -1135,26 +1135,61 @@ def create_dummy_api_context(destinations):
             'accommodations': [
                 {
                     'name': f'{destination} K-Guide 호텔',
-                    'rating': 4.7,
-                    'price': 120000,
-                    'address': f'{destination} 중심가',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'address': f'{destination} 중심가 123',
+                    'url': 'http://place.map.kakao.com/00000001'
+                },
+                {
+                    'name': f'{destination} 시티 호텔',
+                    'address': f'{destination} 중앙로 45',
+                    'url': 'http://place.map.kakao.com/00000002'
+                },
+                {
+                    'name': f'{destination} 관광호텔',
+                    'address': f'{destination} 해안로 120',
+                    'url': 'http://place.map.kakao.com/00000003'
+                },
+                {
+                    'name': f'{destination} 스테이',
+                    'address': f'{destination} 문화길 18',
+                    'url': 'http://place.map.kakao.com/00000004'
+                },
+                {
+                    'name': f'{destination} 비즈니스 호텔',
+                    'address': f'{destination} 교통광장로 112',
+                    'url': 'http://place.map.kakao.com/00000005'
                 }
             ],
 
             'restaurants': [
                 {
-                    'name': f'{destination} 대표 맛집',
+                    'name': f'{destination} 밤실마을',
                     'category': '한식',
-                    'rating': 4.6,
-                    'price': 20000,
-                    'address': f'{destination} 맛집거리',
-                    'opening_hours': '11:00~21:00',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'address': f'{destination} 북구 밤실로 163-9',
+                    'opening_hours': '11:00~22:00',
+                    'representative_menu': '국밥 / 김밥 / 국수 등',
+                    'mapx': '126.9344',
+                    'mapy': '35.1617',
+                    'description': f'{destination} 지역의 한식 맛집입니다.',
+                },
+                {
+                    'name': f'{destination} 모나리자531',
+                    'category': '카페/전통찻집',
+                    'address': f'{destination} 북구 삼소로 352',
+                    'opening_hours': '평일 10:00~22:00 / 식사 10:30~19:30',
+                    'representative_menu': '모과티 / 아메리카노 / 에이드 등',
+                    'mapx': '126.8714',
+                    'mapy': '35.1720',
+                    'description': f'{destination}의 분위기 좋은 카페/전통찻집입니다.',
+                },
+                {
+                    'name': f'{destination} 해피맛집',
+                    'category': '일식',
+                    'address': f'{destination} 서구 상무중앙로 16',
+                    'opening_hours': '12:00~22:00',
+                    'representative_menu': '연어 / 돈까스 / 하이볼 등',
+                    'mapx': '126.8587',
+                    'mapy': '35.1520',
+                    'description': f'{destination}에서 다양한 메뉴를 즐길 수 있는 맛집입니다.',
                 }
             ],
 
@@ -1162,53 +1197,68 @@ def create_dummy_api_context(destinations):
                 'max_temp': 32,
                 'min_temp': 21,
                 'weather': '맑음',
-                'rain_probability': 20,
-                'air_quality': '좋음'
+                'rain_probability': 20
             },
 
-            'attractions': [
+            'tourist_attractions': [
                 {
-                    'name': f'{destination} 대표 관광지',
-                    'category': '문화관광',
-                    'description': f'{destination}의 대표적인 관광 명소입니다.',
-                    'rating': 4.8,
-                    'address': f'{destination} 관광지',
+                    'name': f'{destination} 전통문화관',
+                    'category': '전시관',
+                    'address': f'{destination} 동구 의재로 222',
                     'opening_hours': '09:00~18:00',
-                    'url': 'https://example.com',
-                    'latitude': 37.5665,
-                    'longitude': 126.9780
+                    'mapx': '126.9524',
+                    'mapy': '35.1617',
+                    'description': f'{destination}의 전통과 문화를 체험할 수 있는 매력적인 전시관 공간입니다.'
+                },
+                {
+                    'name': f'{destination} 중외공원',
+                    'category': '공원',
+                    'address': f'{destination} 북구 무등로 1550',
+                    'opening_hours': '상시 개방',
+                    'mapx': '126.9622',
+                    'mapy': '35.2162',
+                    'description': f'{destination}의 아름다운 풍경과 볼거리가 가득한 인기 공원입니다.'
+                },
+                {
+                    'name': f'{destination} 운천저수지',
+                    'category': '강',
+                    'address': f'{destination} 서구 운천로 165',
+                    'opening_hours': '상시 개방',
+                    'mapx': '126.8582',
+                    'mapy': '35.1472',
+                    'description': f'{destination}에서 여행 중 잠깐 들러볼 만한 매력적인 장소입니다.'
                 }
             ],
 
-            'flights': [
-                {
-                    'transport_type': 'flight',
-                    'name': '대한항공',
-                    'departure': '김포공항',
-                    'arrival': destination,
-                    'departure_time': '09:30',
-                    'arrival_time': '10:40',
-                    'duration': 70,
-                    'price': 85000,
-                    'price_type': 'api',
-                    'transfers': 0
-                }
-            ],
+            # 'flights': [
+            #     {
+            #         'transport_type': 'flight',
+            #         'name': '대한항공',
+            #         'departure': '김포공항',
+            #         'arrival': destination,
+            #         'departure_time': '09:30',
+            #         'arrival_time': '10:40',
+            #         'duration': 70,
+            #         'price': 85000,
+            #         'price_type': 'api',
+            #         'transfers': 0
+            #     }
+            # ],
 
-            'transportation': [
-                {
-                    'transport_type': 'train',
-                    'name': 'KTX',
-                    'departure': '서울역',
-                    'arrival': destination,
-                    'departure_time': '09:30',
-                    'arrival_time': '10:40',
-                    'duration': 120,
-                    'price': 50000,
-                    'price_type': 'api',
-                    'transfers': 0
-                }
-            ]
+            # 'transportation': [
+            #     {
+            #         'transport_type': 'train',
+            #         'name': 'KTX',
+            #         'departure': '서울역',
+            #         'arrival': destination,
+            #         'departure_time': '09:30',
+            #         'arrival_time': '10:40',
+            #         'duration': 120,
+            #         'price': 50000,
+            #         'price_type': 'api',
+            #         'transfers': 0
+            #     }
+            # ]
         }
 
         api_context.append(data)
@@ -1230,7 +1280,7 @@ def create_api_context(destinations):
             'accommodations' : get_accommodations(destination),
             'weather' : get_weather(destination),
             'restaurants': restaurant_attraction['restaurants'],
-            'attractions' : restaurant_attraction['tourist_attractions']
+            'tourist_attractions' : restaurant_attraction['tourist_attractions']
         }
         api_context.append(data)
     
@@ -1252,11 +1302,13 @@ if selected_tab == '여행 추천':
                 st.write('여행지 추천 중...')
 
                 st.session_state.destinations = recommend_destination(
-                    gender,
-                    age,
-                    num_of_people,
-                    theme
-                )
+                                    gender=gender,
+                                    age=age,
+                                    num_of_people=num_of_people,
+                                    theme=theme,
+                                    preferred_area=area,
+                                    top_n=3
+                                )
 
                 # 추천 결과가 없는 경우
                 if not st.session_state.destinations:
@@ -1676,8 +1728,8 @@ elif selected_tab == 'K-Guide AI':
 
         st.divider()
         
-        # 숙소, 음식점 정보
-        st.header('숙소, 음식점 정보')
+        # 숙소, 날씨 정보
+        st.header('숙소, 날씨 정보')
 
         col1, col2 = st.columns(2)
 
@@ -1706,95 +1758,33 @@ elif selected_tab == 'K-Guide AI':
 
                 if hotel_list:
 
-                    hotel = hotel_list[0]
-                    # 숙소명
-                    st.info(hotel['name'])
-                    # 별점
-                    st.write(f"별점: {hotel['rating']}")
-                    # 가격
-                    st.write(f"1박 약 {hotel['price']:,}원")
-                    # 주소
-                    st.write(f"주소: {hotel['address']}")
+                    st.caption(f"추천 숙소 ({min(5, len(hotel_list))}곳)")
+                    st.caption(f"숙소별 상세 평점 및 실시간 가격은 카카오맵 상세페이지 링크에서 확인 가능합니다.")
+                    for i, hotel in enumerate(hotel_list[:5], start=1):
 
-                    # url
-                    if hotel.get('url'):
+                        # 숙소명
+                        st.info(f"{i}. {hotel['name']}")
+                        # 주소
+                        st.write(f"주소: {hotel['address']}")
 
-                        st.link_button(
-                            '상세정보',
-                            hotel['url']
-                        )
+                        # 상세보기 및 예약 링크
+                        if hotel.get('url'):
 
-                    # 지도 시각화
-                    if(
-                        hotel.get('latitude') is not None
-                        and hotel.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[hotel['latitude']],
-                            'lon':[hotel['longitude']]
-                        })
+                            st.link_button(
+                                '상세보기 및 예약',
+                                hotel['url']
+                            )
+
+                        if i < min(5, len(hotel_list)):
+                            st.divider()
 
                     else: st.info('추천 숙소 정보가 없습니다.')
 
                 else:
                     st.info('숙소 정보를 불러오는 중입니다.')
 
-        # 맛집
-        with col2:
-            st.subheader('추천 맛집')
-            
-            if selected_api_context:
-
-                restaurant_list = selected_api_context.get('restaurants', [])
-
-                if restaurant_list:
-
-                    restaurant = restaurant_list[0]
-                    # 음식점명
-                    st.info(restaurant['name'])
-                    # 음식 종류
-                    st.write(f"음식 종류: {restaurant['category']}")
-                    # 별점
-                    st.write(f"별점: {restaurant['rating']}")
-                    # 가격
-                    st.write(f"가격: 약 {restaurant['price']:,}원")
-                    # 주소
-                    st.write(f"주소: {restaurant['address']}")
-                    # 영업시간
-                    st.write(f"영업시간: {restaurant['opening_hours']}")
-
-                    # url
-                    if restaurant.get('url'):
-
-                        st.link_button(
-                            '상세 정보',
-                            restaurant['url']
-                        )
-
-                    # 지도 시각화
-                    if(
-                        restaurant.get('latitude') is not None
-                        and restaurant.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[restaurant['latitude']],
-                            'lon':[restaurant['longitude']]
-                        })     
-                                       
-                else:
-                    st.info('추천 맛집 정보가 없습니다.')
-
-            else:           
-                st.info('맛집 정보를 불러오는 중입니다.')
-
-
-        # 날씨, 관광지 추천
-        st.header('날씨, 관광지 추천')
-
-        col1, col2 = st.columns(2)
-
         # 날씨
-        with col1:
+        with col2:
             st.subheader('날씨 정보')
 
             if selected_api_context:
@@ -1802,17 +1792,18 @@ elif selected_tab == 'K-Guide AI':
                 weather = selected_api_context.get('weather', {})
 
                 if weather:
-                    # 기온
-                    st.info(
-                        f"최고 {weather['max_temp']}°C\n"
-                        f"최저 {weather['min_temp']}°C"
-                    )
+
+                    st.caption('실시간 기상 예보')
+
                     # 날씨
-                    st.write(f"날씨: {weather['weather']}")
+                    st.info(f"날씨: {weather['weather']}")
+                    # 기온
+                    st.write(
+                        f"최고 기온 {weather['max_temp']}°C\n"
+                        f"최저 기온 {weather['min_temp']}°C"
+                    )
                     # 강수 확률
                     st.write(f"강수 확률: {weather['rain_probability']}%")
-                    # 미세먼지
-                    st.write(f"미세먼지: {weather['air_quality']}")
 
                 else:
                     st.info('날씨 정보가 없습니다.')
@@ -1821,68 +1812,121 @@ elif selected_tab == 'K-Guide AI':
                 st.info('날씨 정보를 불러오는 중입니다.')
 
 
-        with col2:
-            st.subheader('추천 관광지')
+        # 맛집, 관광지 추천
+        st.header('맛집, 관광지 추천')
 
+        col1, col2 = st.columns(2)
+
+        # 맛집
+        with col1:
+            st.subheader('추천 맛집')
+            
             if selected_api_context:
 
-                attraction_list = selected_api_context.get(
-                    'attractions',
-                    []
-                )
+                restaurant_list = selected_api_context.get('restaurants', [])
 
-                if attraction_list:
+                if restaurant_list:
 
-                    attraction = attraction_list[0]
-                    # 관광지명
-                    st.info( attraction['name'])
-                    # 관광지 테마
-                    st.write(f"테마: {attraction['category']}")
-                    # 설명
-                    st.write(attraction['description'])
-                    # 별점
-                    st.write(f"별점: {attraction['rating']}")
-                    # 주소
-                    st.write(f"주소: {attraction['address']}")
-                    # 운영시간
-                    st.write(f"운영시간: {attraction['opening_hours']}")
-                    # 예상 혼잡도
-                    congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
-                    if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
-                        rate_str = '혼잡도를 예상할 수 없습니다'
-                    elif congestion_rate >= 0.75:
-                        rate_str = '매우 혼잡'
-                    elif congestion_rate >= 0.5:
-                        rate_str = '혼잡'
-                    elif congestion_rate >= 0.25:
-                        rate_str = '한적'
-                    else:
-                        rate_str = '매우 한적'
-                    st.write('예상 혼잡도 :', rate_str)
-                    
+                    st.caption(f'추천 맛집 ({len(restaurant_list)}곳)')
 
-                    # url
-                    if attraction.get('url'):
+                    for i, restaurant in enumerate(restaurant_list[:3], start=1):
 
-                        st.link_button(
-                            '상세 정보',
-                            attraction['url']
-                        )
+                        # 음식점명 (카테고리)
+                        st.info(f"{i}. {restaurant['name']} ({restaurant['category']})")
+                        # 주소
+                        st.write(f"주소: {restaurant['address']}")
+                        # 운영시간
+                        st.write(f"운영시간: {restaurant['opening_hours']}")
+                        # 대표메뉴
+                        # st.write(f"대표메뉴: {restaurant['representative_menu']}")
+                        # 특징
+                        st.write(f"특징: {restaurant['description']}")
 
-                    # 지도 시각화
-                    if(
-                        attraction.get('latitude') is not None
-                        and attraction.get('longitude') is not None
-                    ):
-                        st.map({
-                            'lat':[attraction['latitude']],
-                            'lon':[attraction['longitude']]
-                        })
+                        # 지도 시각화
+                        if(
+                            restaurant.get('mapy') is not None
+                            and restaurant.get('mapx') is not None
+                        ):
+                            try:
+                                lat = float(restaurant['mapy'])
+                                lon = float(restaurant['mapx'])
+                                st.map({
+                                    'lat':[lat],
+                                    'lon':[lon]
+                                })     
+                            except(TypeError, ValueError):
+                                st.info('지도 좌표 정보를 표시할 수 없습니다.')
 
+                        if i < min(3, len(restaurant_list)):
+                            st.divider()
+                                       
+                else:
+                    st.info('추천 맛집 정보가 없습니다.')
+
+            else:           
+                st.info('맛집 정보를 불러오는 중입니다.')
+
+        # 관광지
+        with col2:
+            st.subheader('추천 관광지')
+            
+            if selected_api_context:
+
+                attraction_list = selected_api_context.get('tourist_attractions', [])
+
+                if attraction_list:      
+
+                    for i, attraction in enumerate(attraction_list[:3], start=1):
+
+                        # 광광지명 (카테고리)
+                        st.info(f"{i}. {attraction['name']} ({attraction['category']})")
+                        # 주소
+                        st.write(f"주소: {attraction['address']}")
+                        # 운영시간
+                        st.write(f"운영시간: {attraction['opening_hours']}")
+                        # 특징
+                        st.write(f"특징: {attraction['description']}")
+
+                        # 예상 혼잡도
+                        congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
+                        if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
+                            rate_str = '혼잡도를 예상할 수 없습니다'
+                        elif congestion_rate >= 0.75:
+                            rate_str = '매우 혼잡'
+                        elif congestion_rate >= 0.5:
+                            rate_str = '혼잡'
+                        elif congestion_rate >= 0.25:
+                            rate_str = '한적'
+                        else:
+                            rate_str = '매우 한적'
+                        st.write('예상 혼잡도 :', rate_str)
+
+                        # 지도 시각화
+                        if(
+                            attraction.get('mapy') is not None
+                            and attraction.get('mapx') is not None
+                        ):
+                            try:
+
+                                lat = float(attraction['mapy'])
+                                lon = float(attraction['mapx'])
+
+                                st.map({
+                                    'lat':[lat],
+                                    'lon':[lon]
+                                })
+
+                            except(TypeError, ValueError):
+                                st.info('지도 좌표 정보를 표시할 수 없습니다.')
+
+
+                        if i < min(3, len(attraction_list)):
+                            st.divider()
+                                       
                 else:
                     st.info('추천 관광지 정보가 없습니다.')
 
-            else:
+            else:           
                 st.info('관광지 정보를 불러오는 중입니다.')
 
         # 항공 / 교통
