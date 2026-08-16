@@ -2,12 +2,13 @@ import joblib
 import pandas as pd
 
 from pathlib import Path
-from code_book import AREA_OPTIONS
+from model.code_book import AREA_OPTIONS
 
 
 # 현재 프로젝트 폴더 위치
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / 'data' / 'region_recommender.pkl'
+#MODEL_PATH = BASE_DIR / 'data' / 'region_recommender.pkl'
+MODEL_PATH = Path('data/region_recommender.pkl')
 if not MODEL_PATH.exists():
     raise FileNotFoundError('study_model.py를 먼저 실행해 주세요.')
 model_data = joblib.load(MODEL_PATH)

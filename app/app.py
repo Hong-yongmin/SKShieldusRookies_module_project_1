@@ -2,6 +2,10 @@ import streamlit as st
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+import sys
+
+# 현재 파일 기준 상위(최상위) 폴더 경로를 sys.path에 추가
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # from modules.functions import recommend_destination
 from model.Ruse import recommend_destination
