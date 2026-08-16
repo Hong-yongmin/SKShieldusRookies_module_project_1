@@ -3,14 +3,14 @@
 # app.py에서는 이 함수 하나만 호출해서 사용
 # ============================================================
 
-from api import (
+from transport.api import (
     get_train,
     get_express_bus,
     get_intercity_bus,
     get_domestic_flight_operation_list,
 )
 
-from transport_normalizer import (
+from transport.transport_normalizer import (
     normalize_train,
     normalize_express_bus,
     normalize_intercity_bus,
