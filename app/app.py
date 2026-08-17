@@ -7,20 +7,12 @@ import sys
 # 현재 파일 기준 상위(최상위) 폴더 경로를 sys.path에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# from pathlib import Path
-# # 프로젝트 루트 경로 추가
-# PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-# if str(PROJECT_ROOT) not in sys.path:
-#     sys.path.insert(0, str(PROJECT_ROOT))
-
-# from modules.functions import recommend_destination
 from model.Ruse import recommend_destination
 from model.estimate_expense import estimate_expense
 from model.estimate_peak import EstimatePeak
 
-from main import recommend_places
-from new import get_accommodations, get_weather
+from destination_info.restaurant_attraction import recommend_places
+from destination_info.weather_accommodation import get_accommodations, get_weather
 
 from model.estimate_peak import EstimatePeak
 
@@ -1455,10 +1447,11 @@ elif selected_tab == 'K-Guide AI':
                         if i < min(5, len(hotel_list)):
                             st.divider()
 
-                    else: st.info('추천 숙소 정보가 없습니다.')
+                else: 
+                    st.info('추천 숙소 정보가 없습니다.')
 
-                else:
-                    st.info('숙소 정보를 불러오는 중입니다.')
+            else:
+                st.info('숙소 정보를 불러오는 중입니다.')
 
         # 날씨
         with col2:
@@ -1514,8 +1507,6 @@ elif selected_tab == 'K-Guide AI':
                         st.write(f"주소: {restaurant['address']}")
                         # 운영시간
                         st.write(f"운영시간: {restaurant['opening_hours'].replace('~', r'\~')}")
-                        # 대표메뉴
-                        # st.write(f"대표메뉴: {restaurant['representative_menu']}")
                         # 특징
                         st.write(f"특징: {restaurant['description']}")
 
