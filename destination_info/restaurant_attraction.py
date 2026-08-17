@@ -142,14 +142,22 @@ def get_detail_intro(contentid, contenttypeid):
     if not isinstance(body, dict):
         return {"opening_hours": "정보 없음", "food_type": "정보 없음"}
 
-    items = body.get("items", {}).get("item", []) if body else []
+    items_data = body.get("items", {})
+    if not isinstance(items_data, dict):
+        return { "opening_hours": "정보 없음", "food_type": "정보 없음" }
+
+    items = items_data.get("item", [])
+
     if isinstance(items, dict):
         items = [items]
+
+    if not isinstance(items, list) or not items:
+        return { "opening_hours": "정보 없음", "food_type": "정보 없음" }
         
-    if not items:
-        return {"opening_hours": "정보 없음", "food_type": "정보 없음"}
-    
     item = items[0]
+
+    if not isinstance(item, dict):
+        return { "opening_hours": "정보 없음", "food_type": "정보 없음" }
     
     def clean_html(text):
         if not text:
