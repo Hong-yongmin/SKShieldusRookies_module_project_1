@@ -164,7 +164,7 @@ class EstimatePeak:
 
         is_holiday = date in holiday # 공휴일인지 여부
         day_of_wk = date.dayofweek
-        if day_of_wk == 0 or day_of_wk == 6 or is_holiday:
+        if day_of_wk == 5 or day_of_wk == 6 or is_holiday:
             # 일요일 or 토요일인 경우, 공유일 list에 포함되는 경우 휴일
             dayoff = 1
         yesterday = date - timedelta(days=1)
@@ -190,7 +190,7 @@ class EstimatePeak:
         for date in three_days:
             is_holiday = date in holiday # 공휴일인지 여부
             day_of_wk = date.dayofweek
-            if day_of_wk == 0 or day_of_wk == 6 or is_holiday:
+            if day_of_wk == 5 or day_of_wk == 6 or is_holiday:
                 # 일요일 or 토요일인 경우, 공유일 list에 포함되는 경우 휴일
                 streak +=  1
 
