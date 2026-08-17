@@ -761,8 +761,8 @@ st.set_page_config(
     layout='wide'
 )
 
-st.title('K-Guide')
-st.caption('AI 기반 여행 추천 서비스')
+st.title('✈️ K-Guide')
+st.caption('AI 기반 맞춤형 한국 여행 추천 서비스')
 
 
 # ==========================================
@@ -832,10 +832,10 @@ if 'transport_ids' not in st.session_state:
 # ==========================================
 
 # 사이드바
-st.sidebar.title('사용자 입력 조건')
+st.sidebar.title('📝 여행 정보 입력')
 
 # 추천 내용 전체 초기화
-if st.sidebar.button('추천 내용 초기화'):
+if st.sidebar.button('🔄 추천 내용 초기화'):
 
     st.session_state.current_tab = '여행 추천'
     st.session_state.destinations = []
@@ -960,7 +960,7 @@ def create_api_context(destinations):
 if selected_tab == '여행 추천':
                 
     # 추천 시작 버튼
-    if st.sidebar.button('여행 추천 받기'):
+    if st.sidebar.button('✨ 여행 추천 받기'):
 
         with st.status('맞춤 여행지를 분석합니다...', expanded=True) as status:
 
@@ -1049,9 +1049,9 @@ if selected_tab == '여행 추천':
         st.session_state.trip_started
         and st.session_state.transport_enabled is None
     ):
-        st.subheader('이동 정보 설정')
+        st.subheader('🚆 이동 정보 설정')
 
-        st.write('항공편 및 교통편 정보를 함께 추천 받으시겠습니까?')
+        st.write('항공편 및 교통편도 함께 추천받으시겠습니까?')
         st.info('추천된 여행지 3곳을 기준으로 이동 정보를 조회합니다.')
 
         departure = st.selectbox(
@@ -1254,7 +1254,7 @@ if selected_tab == '여행 추천':
         and st.session_state.transport_enabled is not None
     ):
 
-        st.header('추천 여행지')
+        st.header('🗺️ 추천 여행지')
 
         # 추천 결과 전체 가져오기
         recommendations = st.session_state.recommendation_context
@@ -1358,8 +1358,8 @@ if selected_tab == '여행 추천':
 
 elif selected_tab == 'K-Guide AI':
 
-    st.header("K-Guide AI")
-    st.caption('여행에 대해 궁금한 점 자유롭게 질문')
+    st.header("🤖 K-Guide AI")
+    st.caption('여행에 대해 궁금한 점을 자유롭게 질문해보세요.')
 
 
     # 선택된 여행지 정보
@@ -1406,7 +1406,7 @@ elif selected_tab == 'K-Guide AI':
         st.divider()
         
         # 숙소, 날씨 정보
-        st.header('숙소, 날씨 정보')
+        st.header('🏨 숙소 · 🌤️ 날씨')
 
         col1, col2 = st.columns(2)
 
@@ -1427,7 +1427,7 @@ elif selected_tab == 'K-Guide AI':
 
         # 숙소
         with col1:
-            st.subheader('추천 숙소')
+            st.subheader('🏨 추천 숙소')
 
             if selected_api_context:
 
@@ -1448,7 +1448,7 @@ elif selected_tab == 'K-Guide AI':
                         if hotel.get('url'):
 
                             st.link_button(
-                                '상세보기 및 예약',
+                                '🔗 상세보기 및 예약',
                                 hotel['url']
                             )
 
@@ -1462,7 +1462,7 @@ elif selected_tab == 'K-Guide AI':
 
         # 날씨
         with col2:
-            st.subheader('날씨 정보')
+            st.subheader('🌤️ 날씨 정보')
 
             if selected_api_context:
 
@@ -1490,13 +1490,13 @@ elif selected_tab == 'K-Guide AI':
 
 
         # 맛집, 관광지 추천
-        st.header('맛집, 관광지 추천')
+        st.header('🍽️ 맛집 · 📍 관광지')
 
         col1, col2 = st.columns(2)
 
         # 맛집
         with col1:
-            st.subheader('추천 맛집')
+            st.subheader('🍽️ 추천 맛집')
             
             if selected_api_context:
 
@@ -1545,7 +1545,7 @@ elif selected_tab == 'K-Guide AI':
 
         # 관광지
         with col2:
-            st.subheader('추천 관광지')
+            st.subheader('📍 추천 관광지')
             
             if selected_api_context:
 
@@ -1610,7 +1610,7 @@ elif selected_tab == 'K-Guide AI':
 
         if st.session_state.transport_enabled:
 
-            st.header('항공편, 교통편')
+            st.header('✈️ 항공편 · 🚆 교통편')
 
             # 현재 선택한 여행지의 교통 결과만 가져오기
             transport_data = (
@@ -1678,7 +1678,7 @@ elif selected_tab == 'K-Guide AI':
 
                 with col1:
 
-                    st.subheader('항공편')
+                    st.subheader('✈️ 항공편')
 
                     if flights:
 
@@ -1707,7 +1707,7 @@ elif selected_tab == 'K-Guide AI':
 
                 with col2:
 
-                    st.subheader('교통편')
+                    st.subheader('🚆 교통편')
 
                     if transportation:
 
@@ -1741,7 +1741,7 @@ elif selected_tab == 'K-Guide AI':
             st.markdown(message['content'])
 
     # 사용자 질문
-    if prompt := st.chat_input('질문을 입력하세요!!!'):
+    if prompt := st.chat_input('여행에 대해 궁금한 점을 입력하세요.'):
 
         # 화면에 대화 메시지 출력
         st.chat_message('user').markdown(prompt)
