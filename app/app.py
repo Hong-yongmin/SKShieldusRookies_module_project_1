@@ -1617,20 +1617,6 @@ elif selected_tab == 'K-Guide AI':
                         # 특징
                         st.write(f"특징: {attraction['description']}")
 
-                        # 예상 혼잡도
-                        congestion_rate = estimate_peak.is_peak_season(trip_date, period, attraction['address'])
-                        if congestion_rate == None: # 0이 나오는 경우를 대비해 None과 직접 비교
-                            rate_str = '혼잡도를 예상할 수 없습니다'
-                        elif congestion_rate >= 0.75:
-                            rate_str = '매우 혼잡'
-                        elif congestion_rate >= 0.5:
-                            rate_str = '혼잡'
-                        elif congestion_rate >= 0.25:
-                            rate_str = '한적'
-                        else:
-                            rate_str = '매우 한적'
-                        st.write('예상 혼잡도 :', rate_str)
-
                         # 지도 시각화
                         if(
                             attraction.get('mapy') is not None
