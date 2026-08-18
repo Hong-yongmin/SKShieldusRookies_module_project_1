@@ -3,6 +3,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import os
 import sys
+import json
 
 # 현재 파일 기준 상위(최상위) 폴더 경로를 sys.path에 추가
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -433,6 +434,14 @@ def get_transport_ids(departure, arrival):
     # 동일 지역 여부는 get_transport_results()에서 처리합니다.
     # 여기서는 다른 지역의 교통수단 ID 매핑만 담당합니다.
 
+def create_file(client, file_path):
+    with open(file_path, 'rb') as file_content:
+        result = client.files.create(
+            file=file_content,
+            purpose='assistants'
+        )
+    return result.id
+
     # ==========================================
     # 1. 기차 city code
     # ==========================================
@@ -789,6 +798,52 @@ if 'trip_started' not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "tools" not in st.session_state:
+    file_id = create_file(client, 'data/한국관광공사_OpenAPI_관광지_시군구_코드정보_v1.0.xlsx')
+    vector_store = client.vector_stores.create(
+        name='signgu base'
+    )
+    client.vector_stores.files.create(
+        vector_store_id=vector_store.id,
+        file_id=file_id
+    )
+    st.session_state.tools = [
+                    {
+                        "type": "web_search",
+                        "search_context_size": "low", # 수집 정보 크기 최소화로 비용 절감
+                        #"return_token_budget": 2000   # 검색 전용 토큰 한도를 제한하여 비용 폭증 방어
+                    },
+                    {
+                        'type' : 'function',
+                        'name' : 'is_peak_season',
+                        'description' : '여행날짜, 여행기간, 관광지 주소를 받아 그날 그 장소의 방문자수를 예측',
+                        'parameters' : {
+                            'type' : 'object',
+                            'properties' : {
+                                "trip_date": {
+                                    "type": "string",
+                                    "description" : "여행을 가는 날짜."
+                                    },
+                                "trip_period" : {
+                                    "type": "number",
+                                    "description" : "여행 기간"
+                                    },
+                                "destination" : {
+                                    "type":"string",
+                                    "description" : "관광지의 주소. 주소는 최소한 벡터 스토어에 저장된 파일의 sigunguNm 까지는 포함해야 한다."
+                                    }
+                            },
+                        'required' : ["trip_date", "trip_period", "destination"],
+                        'additionalProperties' : False
+                        },
+                        'strict' : True
+                    },
+                    {
+                        'type' : 'file_search',
+                        'vector_store_ids' : [vector_store.id]
+                    }
+                ]
+
 # ------------------------------------------
 # 항공 / 교통 추천 관련
 # ------------------------------------------
@@ -833,6 +888,10 @@ if st.sidebar.button('🔄 추천 내용 초기화'):
     st.session_state.destinations = []
     st.session_state.selected_recommendation = None
     st.session_state.recommendation_context = []
+
+    st.session_state.hotel_list = []
+    st.session_state.restaurant_list = []
+    st.session_state.attraction_list = []
 
     st.session_state.api_context = []
     st.session_state.trip_started = False
@@ -1424,6 +1483,7 @@ elif selected_tab == 'K-Guide AI':
             if selected_api_context:
 
                 hotel_list = selected_api_context.get('accommodations', [])
+                st.session_state.hotel_list = hotel_list
 
                 if hotel_list:
 
@@ -1494,6 +1554,7 @@ elif selected_tab == 'K-Guide AI':
             if selected_api_context:
 
                 restaurant_list = selected_api_context.get('restaurants', [])
+                st.session_state.restaurant_list = restaurant_list
 
                 if restaurant_list:
 
@@ -1541,6 +1602,7 @@ elif selected_tab == 'K-Guide AI':
             if selected_api_context:
 
                 attraction_list = selected_api_context.get('tourist_attractions', [])
+                st.session_state.attraction_list = attraction_list
 
                 if attraction_list:      
 
@@ -1744,54 +1806,72 @@ elif selected_tab == 'K-Guide AI':
 
         # Responses API를 이용해서 모델 활용
         with st.chat_message('assistant'):
-            
-        # ==========================================
-        # UI 테스트용 출력
-        # ------------------------------------------
-            answer = 'K-Guide AI가 여행 정보를 분석하고 있습니다.'
-            st.markdown(answer)
+        # # ==========================================
+        # # UI 테스트용 출력
+        # # ------------------------------------------
+        #     answer = 'K-Guide AI가 여행 정보를 분석하고 있습니다.'
+        #     st.markdown(answer)
 
-        st.session_state.messages.append({
-            'role': 'assistant',
-            'content': answer
-        })
+        # st.session_state.messages.append({
+        #     'role': 'assistant',
+        #     'content': answer
+        # })
         # ==========================================
-            # response = client.responses.create(
-            #     model='gpt-5.5',
-
-            #     tools=[
-            #         {
-            #             "type": "web_search",
-            #             "search_context_size": "low", # 수집 정보 크기 최소화로 비용 절감
-            #             "return_token_budget": 2000   # 검색 전용 토큰 한도를 제한하여 비용 폭증 방어
-            #         }
-            #     ],
-            
-            #     instructions=f'''
-            #     당신은 한국을 방문한 외국 여행객을 위한 한국 여행 AI 어시스턴트입니다.
-            #     사용자의 여행 조건과 질문을 바탕으로 친절하고 구체적인 여행 정보를 제공합니다.
+            response = client.responses.create(
+                model='gpt-5.5',
+                tools=st.session_state.tools,
+                instructions=f'''
+                당신은 한국을 방문한 외국 여행객을 위한 한국 여행 AI 어시스턴트입니다.
+                사용자의 여행 조건과 질문을 바탕으로 친절하고 구체적인 여행 정보를 제공합니다.
                 
-            #     사용자의 여행 조건:
-            #     - 성별 : {gender}
-            #     - 나이 : {age}
-            #     - 여행 테마 : {theme}
-            #     - 인원수 : {num_of_people}
-            #     - 출발 날짜 : {trip_date}
-            #     - 여행 기간 : {period}일
+                사용자의 여행 조건:
+                - 성별 : {gender}
+                - 나이 : {age}
+                - 여행 테마 : {theme}
+                - 인원수 : {num_of_people}
+                - 출발 날짜 : {trip_date}
+                - 여행 기간 : {period}일
 
-            #     현재 추천된 여행지 : {st.session_state.destinations}
+                현재 추천된 여행지 : {st.session_state.destinations}
+                현재 선택된 여행지 : {st.session_state.selected_recommendation}
+                현재 추천된 숙소 : {st.session_state.hotel_list}
+                현재 추천된 맛집 : {st.session_state.restaurant_list}
+                현재 추천된 관광지 : {st.session_state.attraction_list}
 
-            #     최신 정보가 필요한 경우 웹 검색을 활용하세요.
-            #     특히 날씨, 운영시간, 가격, 숙소, 맛집, 관광지, 교통편 등
-            #     현재 정보가 중요한 질문의 경우에는 웹 검색을 우선으로 활용하세요.
-            #     매우 중요: 첫 번째 시도가 실패하더라도 유사한 검색 쿼리를 반복하지 마십시오.
-            #     1~2회 검색 내에 정확한 정보를 찾을 수 없는 경우,
-            #     검색을 중단하고 보유한 데이터를 바탕으로 최선의 답변을 제공하십시오.
-            #     ''',
-            #     input=st.session_state.messages,
-            #     stream=True,
-            #     max_output_tokens=1500
-            # )
+                최신 정보가 필요한 경우 웹 검색을 활용하세요.
+                특히 날씨, 운영시간, 가격, 숙소, 맛집, 관광지, 교통편 등
+                현재 정보가 중요한 질문의 경우에는 웹 검색을 우선으로 활용하세요.
+
+                사용자가 관광지의 혼잡도나 성수기 여부 등에 대해 질문하면 function calling 결과로 나온
+                방문자수를 기반으로하여 답변하세요.
+
+                매우 중요: 첫 번째 시도가 실패하더라도 유사한 검색 쿼리를 반복하지 마십시오.
+                1~2회 검색 내에 정확한 정보를 찾을 수 없는 경우,
+                검색을 중단하고 보유한 데이터를 바탕으로 최선의 답변을 제공하십시오.
+                ''',
+                input=st.session_state.messages,
+                # stream=True,
+                max_output_tokens=1500
+            )
+
+            for item in response.output:
+                if item.type == 'function_call':
+                    input_msg = st.session_state.messages + response.output
+                    args = json.loads(item.arguments)
+                    pred_tounum = estimate_peak.is_peak_season(**args)
+                    input_msg.append({
+                        'type' : 'function_call_output',
+                        'call_id' : item.call_id,
+                        'output' : str(pred_tounum)
+                    })
+
+                    response = client.responses.create(
+                        model = 'gpt-5.5',
+                        input = input_msg,
+                        tools = st.session_state.tools
+                    )
+                    break
+
 
             # # 스트리밍 청크 생성 함수
             # def gen_chunks():
@@ -1802,13 +1882,14 @@ elif selected_tab == 'K-Guide AI':
             #         elif getattr(event, "type", None) == "response.output_text.delta":
             #             yield event.delta
 
-            # # 화면 출력 => 완전한 응답 데이터 저장
+            # 화면 출력 => 완전한 응답 데이터 저장
             # full_response = st.write_stream(gen_chunks())
+            st.write(response.output_text)
 
-        # # 세션에 저장된 대화 메시지에 응답 데이터 저장
-        # st.session_state.messages.append(
-        #     {
-        #         "role":"assistant",
-        #         "content": full_response
-        #     }
-        # )
+        # 세션에 저장된 대화 메시지에 응답 데이터 저장
+        st.session_state.messages.append(
+            {
+                "role":"assistant",
+                "content": response.output_text
+            }
+        )
