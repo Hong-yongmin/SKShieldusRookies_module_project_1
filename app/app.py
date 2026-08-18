@@ -816,7 +816,7 @@ if "tools" not in st.session_state:
                     {
                         'type' : 'function',
                         'name' : 'is_peak_season',
-                        'description' : '여행날짜, 여행기간, 관광지 주소를 받아 그날 그 장소의 방문자수를 예측',
+                        'description' : '여행날짜, 여행기간, 관광지 주소를 받아 해당 기간 동안 그 장소의 방문자수 비율을 예측',
                         'parameters' : {
                             'type' : 'object',
                             'properties' : {
