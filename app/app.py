@@ -434,14 +434,6 @@ def get_transport_ids(departure, arrival):
     # 동일 지역 여부는 get_transport_results()에서 처리합니다.
     # 여기서는 다른 지역의 교통수단 ID 매핑만 담당합니다.
 
-def create_file(client, file_path):
-    with open(file_path, 'rb') as file_content:
-        result = client.files.create(
-            file=file_content,
-            purpose='assistants'
-        )
-    return result.id
-
     # ==========================================
     # 1. 기차 city code
     # ==========================================
@@ -552,6 +544,14 @@ def create_file(client, file_path):
             'arrAirportId': arr_airport_id
         }
     }
+
+def create_file(client, file_path):
+    with open(file_path, 'rb') as file_content:
+        result = client.files.create(
+            file=file_content,
+            purpose='assistants'
+        )
+    return result.id
 
 def get_transport_results(
     departure,
